@@ -448,6 +448,239 @@ class UniversalSearchAPITester:
             self.log_test("Recent Searches", False, f"Request failed: {str(e)}")
             return False
 
+    def test_dynamic_marketplace_discovery_gaming_laptop(self):
+        """Test dynamic marketplace discovery for gaming laptop in USA"""
+        try:
+            search_data = {
+                "query": "gaming laptop in USA",
+                "max_results": 20
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("data_sources"):
+                    sources = data["data_sources"]
+                    source_names = [s["name"] for s in sources]
+                    
+                    # Check for gaming/electronics-specific marketplaces
+                    gaming_electronics_keywords = [
+                        "newegg", "micro center", "b&h", "best buy", "amazon", 
+                        "electronics", "gaming", "computer", "tech"
+                    ]
+                    
+                    relevant_sources = []
+                    for source in source_names:
+                        source_lower = source.lower()
+                        if any(keyword in source_lower for keyword in gaming_electronics_keywords):
+                            relevant_sources.append(source)
+                    
+                    if len(relevant_sources) > 0:
+                        self.log_test("Dynamic Marketplace Discovery - Gaming Laptop", True, 
+                                    f"Found {len(relevant_sources)} gaming/electronics sources: {relevant_sources[:3]}")
+                        return True
+                    else:
+                        self.log_test("Dynamic Marketplace Discovery - Gaming Laptop", False, 
+                                    f"No gaming/electronics-specific sources found. Sources: {source_names[:5]}")
+                        return False
+                else:
+                    self.log_test("Dynamic Marketplace Discovery - Gaming Laptop", False, 
+                                f"No data sources returned", data)
+                    return False
+            else:
+                self.log_test("Dynamic Marketplace Discovery - Gaming Laptop", False, 
+                            f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Dynamic Marketplace Discovery - Gaming Laptop", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_dynamic_marketplace_discovery_nike_shoes(self):
+        """Test dynamic marketplace discovery for Nike shoes in India"""
+        try:
+            search_data = {
+                "query": "Nike shoes in India",
+                "max_results": 20
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("data_sources"):
+                    sources = data["data_sources"]
+                    source_names = [s["name"] for s in sources]
+                    
+                    # Check for sports/footwear-specific marketplaces
+                    sports_footwear_keywords = [
+                        "nike", "adidas", "foot locker", "sports", "shoes", 
+                        "footwear", "sneakers", "athletic", "myntra", "ajio"
+                    ]
+                    
+                    relevant_sources = []
+                    for source in source_names:
+                        source_lower = source.lower()
+                        if any(keyword in source_lower for keyword in sports_footwear_keywords):
+                            relevant_sources.append(source)
+                    
+                    if len(relevant_sources) > 0:
+                        self.log_test("Dynamic Marketplace Discovery - Nike Shoes", True, 
+                                    f"Found {len(relevant_sources)} sports/footwear sources: {relevant_sources[:3]}")
+                        return True
+                    else:
+                        self.log_test("Dynamic Marketplace Discovery - Nike Shoes", False, 
+                                    f"No sports/footwear-specific sources found. Sources: {source_names[:5]}")
+                        return False
+                else:
+                    self.log_test("Dynamic Marketplace Discovery - Nike Shoes", False, 
+                                f"No data sources returned", data)
+                    return False
+            else:
+                self.log_test("Dynamic Marketplace Discovery - Nike Shoes", False, 
+                            f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Dynamic Marketplace Discovery - Nike Shoes", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_dynamic_marketplace_discovery_construction_materials(self):
+        """Test dynamic marketplace discovery for steel bars construction"""
+        try:
+            search_data = {
+                "query": "steel bars construction",
+                "max_results": 20
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("data_sources"):
+                    sources = data["data_sources"]
+                    source_names = [s["name"] for s in sources]
+                    
+                    # Check for construction/B2B-specific marketplaces
+                    construction_b2b_keywords = [
+                        "indiamart", "alibaba", "construction", "steel", "building", 
+                        "materials", "supply", "industrial", "b2b", "wholesale"
+                    ]
+                    
+                    relevant_sources = []
+                    for source in source_names:
+                        source_lower = source.lower()
+                        if any(keyword in source_lower for keyword in construction_b2b_keywords):
+                            relevant_sources.append(source)
+                    
+                    if len(relevant_sources) > 0:
+                        self.log_test("Dynamic Marketplace Discovery - Construction Materials", True, 
+                                    f"Found {len(relevant_sources)} construction/B2B sources: {relevant_sources[:3]}")
+                        return True
+                    else:
+                        self.log_test("Dynamic Marketplace Discovery - Construction Materials", False, 
+                                    f"No construction/B2B-specific sources found. Sources: {source_names[:5]}")
+                        return False
+                else:
+                    self.log_test("Dynamic Marketplace Discovery - Construction Materials", False, 
+                                f"No data sources returned", data)
+                    return False
+            else:
+                self.log_test("Dynamic Marketplace Discovery - Construction Materials", False, 
+                            f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Dynamic Marketplace Discovery - Construction Materials", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_different_products_different_sources(self):
+        """Test that different products return different marketplace sources"""
+        try:
+            test_queries = [
+                "gaming laptop in USA",
+                "Nike shoes in India", 
+                "steel bars construction"
+            ]
+            
+            all_sources = {}
+            
+            for query in test_queries:
+                search_data = {
+                    "query": query,
+                    "max_results": 10
+                }
+                
+                response = requests.post(
+                    f"{self.api_url}/search", 
+                    json=search_data,
+                    headers={"Content-Type": "application/json"},
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success") and data.get("data_sources"):
+                        sources = [s["name"] for s in data["data_sources"]]
+                        all_sources[query] = set(sources)
+                        print(f"    {query} -> {len(sources)} sources: {sources[:3]}")
+                    else:
+                        print(f"    {query} -> No sources returned")
+                        all_sources[query] = set()
+                else:
+                    print(f"    {query} -> HTTP {response.status_code}")
+                    all_sources[query] = set()
+            
+            # Check if sources are different across queries
+            queries = list(all_sources.keys())
+            differences_found = 0
+            
+            for i in range(len(queries)):
+                for j in range(i + 1, len(queries)):
+                    query1, query2 = queries[i], queries[j]
+                    sources1, sources2 = all_sources[query1], all_sources[query2]
+                    
+                    # Calculate overlap
+                    overlap = len(sources1.intersection(sources2))
+                    total_unique = len(sources1.union(sources2))
+                    
+                    if total_unique > 0:
+                        overlap_percentage = (overlap / total_unique) * 100
+                        if overlap_percentage < 80:  # Less than 80% overlap means they're different
+                            differences_found += 1
+            
+            if differences_found > 0:
+                self.log_test("Different Products Different Sources", True, 
+                            f"Found {differences_found} pairs with different marketplace sources")
+                return True
+            else:
+                self.log_test("Different Products Different Sources", False, 
+                            "All products returned similar marketplace sources")
+                return False
+                
+        except Exception as e:
+            self.log_test("Different Products Different Sources", False, f"Request failed: {str(e)}")
+            return False
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting Universal Product Search Platform Backend Tests")
