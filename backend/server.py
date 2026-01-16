@@ -772,10 +772,12 @@ This might be because:
                 data_sources=[]
             )
         
-        # Generate results from three sources in parallel
-        global_results = generate_search_results(product_data, location_data, currency_info, "global_suppliers", 15)
-        local_results = generate_search_results(product_data, location_data, currency_info, "local_markets", 15)
-        online_results = generate_search_results(product_data, location_data, currency_info, "online_marketplaces", 20)
+        # Generate results from three sources in parallel using async
+        global_results, local_results, online_results = await asyncio.gather(
+            generate_search_results_async(product_data, location_data, currency_info, "global_suppliers", 15),
+            generate_search_results_async(product_data, location_data, currency_info, "local_markets", 15),
+            generate_search_results_async(product_data, location_data, currency_info, "online_marketplaces", 20)
+        )
         
         # Combine all results
         all_results = global_results + local_results + online_results
