@@ -469,6 +469,12 @@ class UniversalSearchAPITester:
         self.test_search_empty_query()
         self.test_search_different_locations()
         
+        # Vendor details tests
+        print("🏪 Testing Vendor Details Feature...")
+        self.test_vendor_details_in_results()
+        self.test_vendor_contact_details_format()
+        self.test_vendor_types_and_verification()
+        
         # Additional endpoint tests
         print("📊 Testing Additional Endpoints...")
         self.test_recent_searches_endpoint()
