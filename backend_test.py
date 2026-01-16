@@ -135,6 +135,192 @@ class UniversalSearchAPITester:
             self.log_test("Search Valid Product", False, f"Request failed: {str(e)}")
             return False
 
+    def test_vendor_details_in_results(self):
+        """Test that search results include vendor details"""
+        try:
+            search_data = {
+                "query": "laptop in USA",
+                "max_results": 10
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("results_count", 0) > 0:
+                    # Check if results contain vendor information
+                    results_with_vendors = 0
+                    vendor_fields_found = []
+                    
+                    for result in data["results"]:
+                        if "vendor" in result and result["vendor"]:
+                            results_with_vendors += 1
+                            vendor = result["vendor"]
+                            
+                            # Check required vendor fields
+                            required_vendor_fields = [
+                                "vendor_name", "vendor_email", "vendor_phone", 
+                                "vendor_address", "vendor_city", "vendor_country"
+                            ]
+                            
+                            for field in required_vendor_fields:
+                                if field in vendor and vendor[field]:
+                                    if field not in vendor_fields_found:
+                                        vendor_fields_found.append(field)
+                    
+                    if results_with_vendors > 0:
+                        self.log_test("Vendor Details in Results", True, 
+                                    f"{results_with_vendors}/{len(data['results'])} results have vendor info. Fields: {vendor_fields_found}")
+                        return True
+                    else:
+                        self.log_test("Vendor Details in Results", False, 
+                                    "No results contain vendor information", data["results"][0] if data["results"] else {})
+                        return False
+                else:
+                    self.log_test("Vendor Details in Results", False, f"No results returned", data)
+                    return False
+            else:
+                self.log_test("Vendor Details in Results", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Vendor Details in Results", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_vendor_contact_details_format(self):
+        """Test vendor contact details are properly formatted"""
+        try:
+            search_data = {
+                "query": "shoes in UK",
+                "max_results": 5
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("results_count", 0) > 0:
+                    valid_vendors = 0
+                    total_vendors = 0
+                    
+                    for result in data["results"]:
+                        if "vendor" in result and result["vendor"]:
+                            total_vendors += 1
+                            vendor = result["vendor"]
+                            
+                            # Validate email format
+                            email = vendor.get("vendor_email", "")
+                            phone = vendor.get("vendor_phone", "")
+                            address = vendor.get("vendor_address", "")
+                            
+                            email_valid = "@" in email and "." in email
+                            phone_valid = len(phone) > 5 and ("+" in phone or phone.replace(" ", "").replace("-", "").isdigit())
+                            address_valid = len(address) > 10
+                            
+                            if email_valid and phone_valid and address_valid:
+                                valid_vendors += 1
+                    
+                    if total_vendors > 0:
+                        success_rate = (valid_vendors / total_vendors) * 100
+                        if success_rate >= 80:  # 80% of vendors should have valid contact details
+                            self.log_test("Vendor Contact Details Format", True, 
+                                        f"{valid_vendors}/{total_vendors} vendors have valid contact details ({success_rate:.1f}%)")
+                            return True
+                        else:
+                            self.log_test("Vendor Contact Details Format", False, 
+                                        f"Only {valid_vendors}/{total_vendors} vendors have valid contact details ({success_rate:.1f}%)")
+                            return False
+                    else:
+                        self.log_test("Vendor Contact Details Format", False, "No vendors found in results")
+                        return False
+                else:
+                    self.log_test("Vendor Contact Details Format", False, f"No results returned", data)
+                    return False
+            else:
+                self.log_test("Vendor Contact Details Format", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Vendor Contact Details Format", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_vendor_types_and_verification(self):
+        """Test vendor types and verification status"""
+        try:
+            search_data = {
+                "query": "headphones in Dubai",
+                "max_results": 8
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and data.get("results_count", 0) > 0:
+                    vendor_types_found = set()
+                    verification_statuses = set()
+                    vendors_with_business_info = 0
+                    
+                    for result in data["results"]:
+                        if "vendor" in result and result["vendor"]:
+                            vendor = result["vendor"]
+                            
+                            # Collect vendor types
+                            vendor_type = vendor.get("vendor_type", "")
+                            if vendor_type:
+                                vendor_types_found.add(vendor_type)
+                            
+                            # Collect verification statuses
+                            verification = vendor.get("verification_status", "")
+                            if verification:
+                                verification_statuses.add(verification)
+                            
+                            # Check business info
+                            if (vendor.get("years_in_business") and 
+                                vendor.get("response_time") and 
+                                vendor.get("business_hours")):
+                                vendors_with_business_info += 1
+                    
+                    expected_types = ["Global Suppliers", "Local Markets", "Online Marketplaces"]
+                    types_match = any(expected in " ".join(vendor_types_found) for expected in expected_types)
+                    
+                    if types_match and len(verification_statuses) > 0 and vendors_with_business_info > 0:
+                        self.log_test("Vendor Types and Verification", True, 
+                                    f"Types: {list(vendor_types_found)}, Verifications: {list(verification_statuses)}, Business info: {vendors_with_business_info}")
+                        return True
+                    else:
+                        self.log_test("Vendor Types and Verification", False, 
+                                    f"Missing vendor metadata. Types: {list(vendor_types_found)}, Verifications: {list(verification_statuses)}")
+                        return False
+                else:
+                    self.log_test("Vendor Types and Verification", False, f"No results returned", data)
+                    return False
+            else:
+                self.log_test("Vendor Types and Verification", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Vendor Types and Verification", False, f"Request failed: {str(e)}")
+            return False
+
     def test_search_unavailable_product(self):
         """Test search with unavailable/fictional product"""
         try:
