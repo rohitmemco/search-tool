@@ -63,6 +63,120 @@ const AvailabilityBadge = ({ status }) => {
   );
 };
 
+// Vendor Info Modal Component
+const VendorInfoModal = ({ vendor, productName }) => {
+  if (!vendor) return null;
+  
+  const getVerificationColor = (status) => {
+    switch (status) {
+      case "Verified Seller": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "Premium Vendor": return "bg-violet-50 text-violet-700 border-violet-200";
+      case "Trusted Supplier": return "bg-blue-50 text-blue-700 border-blue-200";
+      case "Gold Member": return "bg-amber-50 text-amber-700 border-amber-200";
+      default: return "bg-slate-50 text-slate-700 border-slate-200";
+    }
+  };
+  
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="mt-3 w-full text-xs" data-testid="view-vendor-btn">
+          <Building2 className="w-3 h-3 mr-1" />
+          View Vendor Details
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg" data-testid="vendor-modal">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-['Manrope']">
+            <Store className="w-5 h-5 text-blue-600" />
+            Vendor Information
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
+          {/* Vendor Name & Status */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="font-semibold text-lg text-slate-800">{vendor.vendor_name}</h3>
+              <p className="text-sm text-slate-500">{vendor.vendor_type}</p>
+            </div>
+            <Badge variant="outline" className={getVerificationColor(vendor.verification_status)}>
+              <BadgeCheck className="w-3 h-3 mr-1" />
+              {vendor.verification_status}
+            </Badge>
+          </div>
+          
+          {/* Product Being Sold */}
+          <div className="bg-slate-50 rounded-lg p-3">
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Selling</p>
+            <p className="text-sm font-medium text-slate-800">{productName}</p>
+          </div>
+          
+          {/* Contact Details Grid */}
+          <div className="grid grid-cols-1 gap-3">
+            {/* Email */}
+            <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Email</p>
+                <a href={`mailto:${vendor.vendor_email}`} className="text-sm font-medium text-blue-600 hover:underline">
+                  {vendor.vendor_email}
+                </a>
+              </div>
+            </div>
+            
+            {/* Phone */}
+            <div className="flex items-center gap-3 p-3 bg-emerald-50/50 rounded-lg">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Phone</p>
+                <a href={`tel:${vendor.vendor_phone}`} className="text-sm font-medium text-emerald-600 hover:underline">
+                  {vendor.vendor_phone}
+                </a>
+              </div>
+            </div>
+            
+            {/* Address */}
+            <div className="flex items-start gap-3 p-3 bg-violet-50/50 rounded-lg">
+              <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Address</p>
+                <p className="text-sm font-medium text-slate-700">{vendor.vendor_address}</p>
+                <p className="text-xs text-slate-500 mt-1">{vendor.vendor_city}, {vendor.vendor_country}</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Additional Info */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="text-center p-3 bg-slate-50 rounded-lg">
+              <Clock className="w-4 h-4 mx-auto text-slate-400 mb-1" />
+              <p className="text-xs text-slate-500">Response Time</p>
+              <p className="text-sm font-medium text-slate-700">{vendor.response_time}</p>
+            </div>
+            <div className="text-center p-3 bg-slate-50 rounded-lg">
+              <Building2 className="w-4 h-4 mx-auto text-slate-400 mb-1" />
+              <p className="text-xs text-slate-500">In Business</p>
+              <p className="text-sm font-medium text-slate-700">{vendor.years_in_business} years</p>
+            </div>
+          </div>
+          
+          {/* Business Hours */}
+          <div className="flex items-center gap-2 text-sm text-slate-600 pt-2 border-t">
+            <Clock className="w-4 h-4" />
+            <span>{vendor.business_hours}</span>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Product Card Component
 const ProductCard = ({ product, index }) => {
   return (
@@ -93,11 +207,21 @@ const ProductCard = ({ product, index }) => {
           <AvailabilityBadge status={product.availability} />
         </div>
         <p className="product-card-description">{product.description}</p>
+        
+        {/* Vendor Quick Info */}
+        {product.vendor && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-1">Vendor</p>
+            <p className="text-sm font-medium text-slate-700 truncate">{product.vendor.vendor_name}</p>
+            <VendorInfoModal vendor={product.vendor} productName={product.name} />
+          </div>
+        )}
+        
         <a
           href={product.source_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
           data-testid={`view-source-${index}`}
         >
           View on {product.source}
