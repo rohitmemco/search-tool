@@ -422,6 +422,139 @@ const DataSourcesSection = ({ dataSources }) => {
   );
 };
 
+// Vendors Section Component
+const VendorsSection = ({ results }) => {
+  // Get unique vendors
+  const vendorsMap = new Map();
+  results.forEach(product => {
+    if (product.vendor) {
+      const key = product.vendor.vendor_email;
+      if (!vendorsMap.has(key)) {
+        vendorsMap.set(key, {
+          ...product.vendor,
+          products: [product.name],
+          lowestPrice: product.price,
+          currencySymbol: product.currency_symbol
+        });
+      } else {
+        const existing = vendorsMap.get(key);
+        existing.products.push(product.name);
+        if (product.price < existing.lowestPrice) {
+          existing.lowestPrice = product.price;
+        }
+      }
+    }
+  });
+  
+  const vendors = Array.from(vendorsMap.values());
+  
+  const getVendorTypeColor = (type) => {
+    if (type.includes("Global")) return "bg-blue-50 text-blue-700 border-blue-200";
+    if (type.includes("Local")) return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    return "bg-violet-50 text-violet-700 border-violet-200";
+  };
+  
+  const getVerificationColor = (status) => {
+    switch (status) {
+      case "Verified Seller": return "bg-emerald-100 text-emerald-700";
+      case "Premium Vendor": return "bg-violet-100 text-violet-700";
+      case "Trusted Supplier": return "bg-blue-100 text-blue-700";
+      case "Gold Member": return "bg-amber-100 text-amber-700";
+      default: return "bg-slate-100 text-slate-700";
+    }
+  };
+  
+  return (
+    <div data-testid="vendors-section">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-slate-800 font-['Manrope']">
+          <Users className="w-5 h-5 inline mr-2 text-blue-600" />
+          Vendor Directory ({vendors.length} vendors)
+        </h3>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {vendors.map((vendor, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-lg hover:border-blue-200 transition-all"
+            data-testid={`vendor-card-${index}`}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h4 className="font-semibold text-slate-800 text-lg">{vendor.vendor_name}</h4>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className={getVendorTypeColor(vendor.vendor_type)}>
+                    {vendor.vendor_type}
+                  </Badge>
+                  <Badge className={getVerificationColor(vendor.verification_status)}>
+                    <BadgeCheck className="w-3 h-3 mr-1" />
+                    {vendor.verification_status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-500">From</p>
+                <p className="text-lg font-bold text-blue-600">
+                  {vendor.currencySymbol}{vendor.lowestPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+            
+            {/* Contact Info Grid */}
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 text-slate-600">
+                <Mail className="w-4 h-4 text-blue-500" />
+                <a href={`mailto:${vendor.vendor_email}`} className="hover:text-blue-600 hover:underline truncate">
+                  {vendor.vendor_email}
+                </a>
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <Phone className="w-4 h-4 text-emerald-500" />
+                <a href={`tel:${vendor.vendor_phone}`} className="hover:text-emerald-600 hover:underline">
+                  {vendor.vendor_phone}
+                </a>
+              </div>
+              <div className="flex items-start gap-2 text-slate-600">
+                <MapPin className="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" />
+                <span className="line-clamp-2">{vendor.vendor_address}</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-600">
+                <Globe className="w-4 h-4 text-slate-400" />
+                <span>{vendor.vendor_city}, {vendor.vendor_country}</span>
+              </div>
+            </div>
+            
+            {/* Footer Info */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {vendor.response_time}
+              </div>
+              <div className="flex items-center gap-1">
+                <Building2 className="w-3 h-3" />
+                {vendor.years_in_business} years in business
+              </div>
+            </div>
+            
+            {/* Products Count */}
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                <Package className="w-3 h-3 inline mr-1" />
+                {vendor.products.length} product{vendor.products.length > 1 ? 's' : ''} available
+              </p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Search Unavailable Component
 const SearchUnavailable = ({ query, message }) => {
   return (
