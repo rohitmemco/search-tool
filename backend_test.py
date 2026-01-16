@@ -1,0 +1,329 @@
+#!/usr/bin/env python3
+"""
+Universal Product Search Platform - Backend API Testing
+Tests all backend endpoints and functionality
+"""
+
+import requests
+import sys
+import json
+from datetime import datetime
+from typing import Dict, Any
+
+class UniversalSearchAPITester:
+    def __init__(self, base_url="https://pricesearch-3.preview.emergentagent.com"):
+        self.base_url = base_url
+        self.api_url = f"{base_url}/api"
+        self.tests_run = 0
+        self.tests_passed = 0
+        self.test_results = []
+
+    def log_test(self, name: str, success: bool, details: str = "", response_data: Any = None):
+        """Log test result"""
+        self.tests_run += 1
+        if success:
+            self.tests_passed += 1
+        
+        result = {
+            "test_name": name,
+            "success": success,
+            "details": details,
+            "timestamp": datetime.now().isoformat()
+        }
+        if response_data:
+            result["response_sample"] = str(response_data)[:200] + "..." if len(str(response_data)) > 200 else str(response_data)
+        
+        self.test_results.append(result)
+        
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} - {name}")
+        if details:
+            print(f"    Details: {details}")
+        if not success and response_data:
+            print(f"    Response: {response_data}")
+        print()
+
+    def test_health_endpoint(self):
+        """Test health check endpoint"""
+        try:
+            response = requests.get(f"{self.api_url}/health", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status") == "healthy":
+                    self.log_test("Health Check", True, f"Status: {data.get('status')}, Model: {data.get('model')}")
+                    return True
+                else:
+                    self.log_test("Health Check", False, f"Unexpected status: {data.get('status')}", data)
+                    return False
+            else:
+                self.log_test("Health Check", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Health Check", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_root_endpoint(self):
+        """Test root API endpoint"""
+        try:
+            response = requests.get(f"{self.api_url}/", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("status") == "online":
+                    self.log_test("Root Endpoint", True, f"Message: {data.get('message')}, Version: {data.get('version')}")
+                    return True
+                else:
+                    self.log_test("Root Endpoint", False, f"Unexpected response", data)
+                    return False
+            else:
+                self.log_test("Root Endpoint", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Root Endpoint", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_search_valid_product(self):
+        """Test search with valid product"""
+        try:
+            search_data = {
+                "query": "iPhone 15 price in India",
+                "max_results": 20
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Validate response structure
+                required_fields = ["success", "query", "results", "results_count", "ai_model", "data_sources"]
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    self.log_test("Search Valid Product", False, f"Missing fields: {missing_fields}", data)
+                    return False
+                
+                if data.get("success") and data.get("results_count", 0) > 0:
+                    # Validate result structure
+                    first_result = data["results"][0] if data["results"] else {}
+                    result_fields = ["name", "price", "currency_symbol", "source", "rating", "availability"]
+                    missing_result_fields = [field for field in result_fields if field not in first_result]
+                    
+                    if missing_result_fields:
+                        self.log_test("Search Valid Product", False, f"Missing result fields: {missing_result_fields}", first_result)
+                        return False
+                    
+                    self.log_test("Search Valid Product", True, 
+                                f"Found {data['results_count']} results, AI Model: {data.get('ai_model')}")
+                    return True
+                else:
+                    self.log_test("Search Valid Product", False, f"No results or failed search", data)
+                    return False
+            else:
+                self.log_test("Search Valid Product", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Search Valid Product", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_search_unavailable_product(self):
+        """Test search with unavailable/fictional product"""
+        try:
+            search_data = {
+                "query": "unicorn dust",
+                "max_results": 10
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Should return success=False for unavailable products
+                if not data.get("success") and data.get("message") == "Search Unavailable":
+                    self.log_test("Search Unavailable Product", True, 
+                                f"Correctly identified unavailable product: {data.get('query')}")
+                    return True
+                else:
+                    self.log_test("Search Unavailable Product", False, 
+                                f"Should return unavailable for fictional products", data)
+                    return False
+            else:
+                self.log_test("Search Unavailable Product", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Search Unavailable Product", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_search_empty_query(self):
+        """Test search with empty query"""
+        try:
+            search_data = {
+                "query": "",
+                "max_results": 10
+            }
+            
+            response = requests.post(
+                f"{self.api_url}/search", 
+                json=search_data,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            # Should return 400 for empty query
+            if response.status_code == 400:
+                self.log_test("Search Empty Query", True, "Correctly rejected empty query")
+                return True
+            else:
+                self.log_test("Search Empty Query", False, f"Should return 400 for empty query, got {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Search Empty Query", False, f"Request failed: {str(e)}")
+            return False
+
+    def test_search_different_locations(self):
+        """Test search with different location contexts"""
+        locations = [
+            "laptop in USA",
+            "shoes in UK", 
+            "TV in India",
+            "headphones in Dubai"
+        ]
+        
+        success_count = 0
+        
+        for query in locations:
+            try:
+                search_data = {
+                    "query": query,
+                    "max_results": 5
+                }
+                
+                response = requests.post(
+                    f"{self.api_url}/search", 
+                    json=search_data,
+                    headers={"Content-Type": "application/json"},
+                    timeout=20
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success") and data.get("results_count", 0) > 0:
+                        success_count += 1
+                        # Check if currency is appropriate for location
+                        first_result = data["results"][0] if data["results"] else {}
+                        currency = first_result.get("currency_symbol", "")
+                        print(f"    {query} -> {data['results_count']} results, Currency: {currency}")
+                    
+            except Exception as e:
+                print(f"    {query} -> Error: {str(e)}")
+        
+        if success_count >= len(locations) * 0.75:  # 75% success rate
+            self.log_test("Search Different Locations", True, f"Successfully processed {success_count}/{len(locations)} location queries")
+            return True
+        else:
+            self.log_test("Search Different Locations", False, f"Only {success_count}/{len(locations)} location queries succeeded")
+            return False
+
+    def test_recent_searches_endpoint(self):
+        """Test recent searches endpoint"""
+        try:
+            response = requests.get(f"{self.api_url}/recent-searches", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "searches" in data and isinstance(data["searches"], list):
+                    self.log_test("Recent Searches", True, f"Retrieved {len(data['searches'])} recent searches")
+                    return True
+                else:
+                    self.log_test("Recent Searches", False, "Invalid response structure", data)
+                    return False
+            else:
+                self.log_test("Recent Searches", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Recent Searches", False, f"Request failed: {str(e)}")
+            return False
+
+    def run_all_tests(self):
+        """Run all backend tests"""
+        print("🚀 Starting Universal Product Search Platform Backend Tests")
+        print("=" * 60)
+        
+        # Basic connectivity tests
+        print("📡 Testing Basic Connectivity...")
+        health_ok = self.test_health_endpoint()
+        root_ok = self.test_root_endpoint()
+        
+        if not (health_ok and root_ok):
+            print("❌ Basic connectivity failed. Stopping tests.")
+            return False
+        
+        # Search functionality tests
+        print("🔍 Testing Search Functionality...")
+        self.test_search_valid_product()
+        self.test_search_unavailable_product()
+        self.test_search_empty_query()
+        self.test_search_different_locations()
+        
+        # Additional endpoint tests
+        print("📊 Testing Additional Endpoints...")
+        self.test_recent_searches_endpoint()
+        
+        return True
+
+    def print_summary(self):
+        """Print test summary"""
+        print("=" * 60)
+        print("📊 TEST SUMMARY")
+        print("=" * 60)
+        print(f"Total Tests: {self.tests_run}")
+        print(f"Passed: {self.tests_passed}")
+        print(f"Failed: {self.tests_run - self.tests_passed}")
+        print(f"Success Rate: {(self.tests_passed/self.tests_run*100):.1f}%")
+        
+        if self.tests_run - self.tests_passed > 0:
+            print("\n❌ Failed Tests:")
+            for result in self.test_results:
+                if not result["success"]:
+                    print(f"  - {result['test_name']}: {result['details']}")
+        
+        return self.tests_passed == self.tests_run
+
+def main():
+    """Main test execution"""
+    tester = UniversalSearchAPITester()
+    
+    try:
+        success = tester.run_all_tests()
+        tester.print_summary()
+        
+        # Return appropriate exit code
+        return 0 if success else 1
+        
+    except KeyboardInterrupt:
+        print("\n⚠️  Tests interrupted by user")
+        return 1
+    except Exception as e:
+        print(f"\n💥 Unexpected error: {str(e)}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
