@@ -185,23 +185,26 @@ DO NOT try to be creative or find alternatives. If a product is fictional, mythi
 
 Return a JSON object with exactly this structure (no markdown, no code blocks):
 {{
-    "is_searchable": true or false (false if product doesn't exist or is not commercially available),
+    "is_searchable": true or false (MUST be false if: 1) product is fictional/mythical/imaginary, 2) product doesn't exist commercially, 3) search term is abstract concept, 4) product name contains fantasy elements),
     "product_name": "main product name",
     "products": ["variation 1", "variation 2", "variation 3", "variation 4", "variation 5"],
     "brands": ["brand1", "brand2", "brand3", "brand4", "brand5"],
-    "price_range_min": minimum typical price in INR,
-    "price_range_max": maximum typical price in INR,
+    "price_range_min": minimum typical price in INR (0 if not searchable),
+    "price_range_max": maximum typical price in INR (0 if not searchable),
     "unit": "per piece" or "per kg" or appropriate unit,
     "descriptions": ["feature 1", "feature 2", "feature 3", "feature 4", "feature 5"],
     "category": "Electronics/Fashion/Home/Construction/Food/etc"
 }}
 
-Rules:
-- If the product is fictional, abstract, or not commercially available, set is_searchable to false
-- Provide 5 real product variations with different specs/models
-- Provide 5 real brands that make this product
-- Provide realistic price ranges in Indian Rupees (INR)
-- Provide 5 key features/descriptions"""
+CRITICAL RULES:
+- Set is_searchable to FALSE for anything fictional, mythical, impossible, or not commercially sold
+- DO NOT try to find creative alternatives or similar real products
+- If the exact product doesn't exist in real markets, is_searchable MUST be false
+- Examples of NOT searchable: unicorn dust, dragon scales, magic wands, time machines, fictional items
+- Only set is_searchable to TRUE for real, tangible products sold in actual stores
+- Provide 5 real product variations with different specs/models (only if searchable)
+- Provide 5 real brands that make this product (only if searchable)
+- Provide realistic price ranges in Indian Rupees (INR)"""
 
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
