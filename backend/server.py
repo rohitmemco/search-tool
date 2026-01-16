@@ -317,100 +317,102 @@ def get_currency_info(country: str) -> Dict[str, Any]:
     """Get currency info for country"""
     return CURRENCY_DATA.get(country.lower(), CURRENCY_DATA["global"])
 
-def get_marketplaces_for_region(country: str, source_type: str) -> List[Dict[str, str]]:
-    """Get appropriate marketplaces for region and source type"""
-    marketplaces = {
-        "india": {
-            "global_suppliers": [
-                {"name": "IndiaMART", "url": "https://www.indiamart.com/search.html?ss="},
-                {"name": "TradeIndia", "url": "https://www.tradeindia.com/search.html?search="},
-                {"name": "ExportersIndia", "url": "https://www.exportersindia.com/search.htm?search="},
-                {"name": "Alibaba", "url": "https://www.alibaba.com/trade/search?SearchText="},
-            ],
-            "local_markets": [
-                {"name": "JustDial", "url": "https://www.justdial.com/search?q="},
-                {"name": "Sulekha", "url": "https://www.sulekha.com/search?q="},
-                {"name": "UrbanClap", "url": "https://www.urbancompany.com/search?q="},
-                {"name": "Local Vendors", "url": "https://www.google.com/search?q="},
-            ],
-            "online_marketplaces": [
-                {"name": "Amazon.in", "url": "https://www.amazon.in/s?k="},
-                {"name": "Flipkart", "url": "https://www.flipkart.com/search?q="},
-                {"name": "Croma", "url": "https://www.croma.com/searchB?q="},
-                {"name": "Reliance Digital", "url": "https://www.reliancedigital.in/search?q="},
-                {"name": "Snapdeal", "url": "https://www.snapdeal.com/search?keyword="},
-            ]
-        },
-        "usa": {
-            "global_suppliers": [
-                {"name": "Alibaba.com", "url": "https://www.alibaba.com/trade/search?SearchText="},
-                {"name": "ThomasNet", "url": "https://www.thomasnet.com/search.html?what="},
-                {"name": "Global Sources", "url": "https://www.globalsources.com/searchList/products?search="},
-            ],
-            "local_markets": [
-                {"name": "Yelp Business", "url": "https://www.yelp.com/search?find_desc="},
-                {"name": "Yellow Pages", "url": "https://www.yellowpages.com/search?search_terms="},
-                {"name": "Local Suppliers", "url": "https://www.google.com/search?q="},
-            ],
-            "online_marketplaces": [
-                {"name": "Amazon.com", "url": "https://www.amazon.com/s?k="},
-                {"name": "eBay", "url": "https://www.ebay.com/sch/i.html?_nkw="},
-                {"name": "Walmart", "url": "https://www.walmart.com/search?q="},
-                {"name": "Best Buy", "url": "https://www.bestbuy.com/site/searchpage.jsp?st="},
-                {"name": "Target", "url": "https://www.target.com/s?searchTerm="},
-            ]
-        },
-        "uk": {
-            "global_suppliers": [
-                {"name": "Alibaba UK", "url": "https://www.alibaba.com/trade/search?SearchText="},
-                {"name": "Global Sources", "url": "https://www.globalsources.com/searchList/products?search="},
-            ],
-            "local_markets": [
-                {"name": "Yell", "url": "https://www.yell.com/ucs/UcsSearchAction.do?keywords="},
-                {"name": "Local UK", "url": "https://www.google.co.uk/search?q="},
-            ],
-            "online_marketplaces": [
-                {"name": "Amazon.co.uk", "url": "https://www.amazon.co.uk/s?k="},
-                {"name": "Argos", "url": "https://www.argos.co.uk/search/"},
-                {"name": "Currys", "url": "https://www.currys.co.uk/search?q="},
-                {"name": "John Lewis", "url": "https://www.johnlewis.com/search?search-term="},
-            ]
-        },
-        "uae": {
-            "global_suppliers": [
-                {"name": "TradeArabia", "url": "https://www.tradearabia.com/search?q="},
-                {"name": "Alibaba Middle East", "url": "https://www.alibaba.com/trade/search?SearchText="},
-            ],
-            "local_markets": [
-                {"name": "Dubizzle", "url": "https://dubai.dubizzle.com/search/?keywords="},
-                {"name": "Local UAE", "url": "https://www.google.ae/search?q="},
-            ],
-            "online_marketplaces": [
-                {"name": "Amazon.ae", "url": "https://www.amazon.ae/s?k="},
-                {"name": "Noon.com", "url": "https://www.noon.com/uae-en/search?q="},
-                {"name": "Carrefour UAE", "url": "https://www.carrefouruae.com/search?q="},
-                {"name": "Sharaf DG", "url": "https://uae.sharafdg.com/search/?q="},
-            ]
-        }
-    }
+# Cache for dynamic marketplaces
+_marketplace_cache = {}
+
+async def discover_marketplaces_with_ai(product_name: str, category: str, country: str, source_type: str) -> List[Dict[str, str]]:
+    """Use AI to dynamically discover relevant marketplaces for a specific product"""
+    cache_key = f"{product_name}_{category}_{country}_{source_type}"
     
-    # Default global marketplaces
-    default_marketplaces = {
+    if cache_key in _marketplace_cache:
+        return _marketplace_cache[cache_key]
+    
+    try:
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            return get_fallback_marketplaces(country, source_type)
+        
+        source_descriptions = {
+            "global_suppliers": "B2B wholesale suppliers, international trade platforms, manufacturer directories",
+            "local_markets": "local retail stores, regional dealers, neighborhood shops, local business directories",
+            "online_marketplaces": "e-commerce websites, online retail stores, digital shopping platforms"
+        }
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"marketplace-discovery-{uuid.uuid4()}",
+            system_message="You are a marketplace expert. Return ONLY valid JSON with no extra text."
+        )
+        chat.with_model("openai", "gpt-5.2")
+        
+        prompt = f"""Find REAL marketplaces where "{product_name}" (category: {category}) is sold in {country.upper()}.
+        
+Source type: {source_type} ({source_descriptions.get(source_type, 'various marketplaces')})
+
+Return a JSON array with 4-6 REAL, EXISTING marketplaces. Each must have:
+- "name": Real marketplace/store name (must actually exist)
+- "url": Real search URL pattern (use actual website search URLs)
+
+Example format:
+[
+    {{"name": "StoreName", "url": "https://www.storename.com/search?q="}}
+]
+
+IMPORTANT:
+- Only include REAL marketplaces that actually sell {product_name}
+- Use actual working search URLs for those websites
+- Be specific to the product category - don't use generic marketplaces unless they're relevant
+- For {source_type}, focus on {source_descriptions.get(source_type, 'relevant platforms')}
+- Consider {country.upper()} regional marketplaces
+
+Return ONLY the JSON array, no other text."""
+
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        
+        marketplaces = json.loads(response_text)
+        
+        if isinstance(marketplaces, list) and len(marketplaces) > 0:
+            # Validate structure
+            valid_marketplaces = []
+            for mp in marketplaces:
+                if isinstance(mp, dict) and "name" in mp and "url" in mp:
+                    valid_marketplaces.append(mp)
+            
+            if valid_marketplaces:
+                _marketplace_cache[cache_key] = valid_marketplaces
+                return valid_marketplaces
+        
+        return get_fallback_marketplaces(country, source_type)
+        
+    except Exception as e:
+        logger.error(f"AI marketplace discovery error: {e}")
+        return get_fallback_marketplaces(country, source_type)
+
+def get_fallback_marketplaces(country: str, source_type: str) -> List[Dict[str, str]]:
+    """Fallback marketplaces when AI discovery fails"""
+    fallback = {
         "global_suppliers": [
             {"name": "Alibaba", "url": "https://www.alibaba.com/trade/search?SearchText="},
             {"name": "Global Sources", "url": "https://www.globalsources.com/searchList/products?search="},
+            {"name": "Made-in-China", "url": "https://www.made-in-china.com/products-search/hot-china-products/"},
         ],
         "local_markets": [
-            {"name": "Local Search", "url": "https://www.google.com/search?q="},
+            {"name": "Google Local", "url": "https://www.google.com/search?q="},
+            {"name": "Yelp", "url": "https://www.yelp.com/search?find_desc="},
         ],
         "online_marketplaces": [
             {"name": "Amazon", "url": "https://www.amazon.com/s?k="},
             {"name": "eBay", "url": "https://www.ebay.com/sch/i.html?_nkw="},
         ]
     }
-    
-    country_markets = marketplaces.get(country.lower(), default_marketplaces)
-    return country_markets.get(source_type, default_marketplaces[source_type])
+    return fallback.get(source_type, fallback["online_marketplaces"])
 
 def generate_vendor_details(marketplace_name: str, source_type: str, location_data: Dict) -> Dict[str, Any]:
     """Generate realistic vendor details based on marketplace and location"""
