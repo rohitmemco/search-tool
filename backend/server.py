@@ -150,12 +150,34 @@ async def detect_product_with_ai(query: str) -> Dict[str, Any]:
             logger.warning("No EMERGENT_LLM_KEY found, using fallback")
             return fallback_product_detection(query)
         
+        # Check for obviously fictional/impossible items first
+        fictional_keywords = [
+            "unicorn", "dragon", "magic", "wizard", "fairy", "mythical", 
+            "time machine", "teleporter", "perpetual motion", "infinity",
+            "impossible", "fictional", "fantasy", "imaginary"
+        ]
+        query_lower = query.lower()
+        for keyword in fictional_keywords:
+            if keyword in query_lower:
+                return {
+                    "is_searchable": False,
+                    "product_name": query,
+                    "products": [],
+                    "brands": [],
+                    "price_range_min": 0,
+                    "price_range_max": 0,
+                    "unit": "per piece",
+                    "descriptions": [],
+                    "category": "Unknown"
+                }
+        
         chat = LlmChat(
             api_key=api_key,
             session_id=f"product-detection-{uuid.uuid4()}",
-            system_message="""You are a product analysis AI. Analyze user queries and extract product information.
+            system_message="""You are a strict product analysis AI. Analyze user queries and extract product information.
 Return ONLY valid JSON with no markdown formatting, no code blocks, just the raw JSON object.
-You must identify real, purchasable products and provide accurate information."""
+You must identify REAL, COMMERCIALLY AVAILABLE products only. 
+DO NOT try to be creative or find alternatives. If a product is fictional, mythical, or doesn't exist as a real commercial product, set is_searchable to false."""
         )
         chat.with_model("openai", "gpt-5.2")
         
