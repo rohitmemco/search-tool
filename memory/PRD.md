@@ -23,40 +23,42 @@ Build a comprehensive web-based application that enables users to search for any
 - Interactive price comparison charts
 - PDF export functionality
 - "Search Unavailable" handling for non-existent products
+- **Vendor details** (name, email, phone, address, location) for all results
 
-## What's Been Implemented (Jan 16, 2026)
+## What's Been Implemented
 
-### Backend (/app/backend/server.py)
+### Jan 16, 2026 - Initial MVP
 - ✅ AI product detection using emergentintegrations (GPT-5.2)
 - ✅ Location extraction from queries (50+ cities, multiple countries)
 - ✅ Currency conversion (INR, USD, GBP, AED, EUR, JPY, AUD, CAD)
 - ✅ Multi-source search generation (15+ marketplaces per region)
 - ✅ Market analysis and insights generation
 - ✅ Search unavailable detection for fictional products
-- ✅ Search history storage in MongoDB
-
-### Frontend (/app/frontend/src/App.js)
-- ✅ Modern gradient design with Manrope + DM Sans fonts
-- ✅ Hero section with feature cards
-- ✅ Search form with example query pills
-- ✅ Price summary cards (Min, Max, Avg)
-- ✅ Product cards grid with images, ratings, availability
-- ✅ Tabbed interface (Products, Charts, Insights, Sources)
-- ✅ Price comparison bar chart (Recharts)
-- ✅ Source distribution pie chart (Recharts)
-- ✅ Markdown-rendered market insights
-- ✅ Data sources section with external links
+- ✅ Modern gradient UI with Manrope + DM Sans fonts
+- ✅ Interactive charts (bar, pie)
 - ✅ PDF export functionality
-- ✅ Search unavailable warning state
-- ✅ Sticky header with compact search
-- ✅ Sonner toast notifications
-- ✅ Framer Motion animations
+
+### Jan 16, 2026 - Vendor Details Feature
+- ✅ **Vendor data generation** for all search results
+- ✅ Vendor details include: name, email, phone, address, city, country
+- ✅ Vendor metadata: type, verification status, years in business, response time, business hours
+- ✅ **Vendor Details Modal** in product cards (click "View Vendor Details")
+- ✅ **New Vendors Tab** showing Vendor Directory with all vendor contact info
+- ✅ Region-specific vendor data (India, USA, UK, UAE addresses)
+- ✅ Clickable email and phone links
 
 ## API Endpoints
 - `GET /api/` - API info
 - `GET /api/health` - Health check
-- `POST /api/search` - Product search (query, max_results)
+- `POST /api/search` - Product search with vendor details
 - `GET /api/recent-searches` - Get recent searches
+
+## Tabs in Results View
+1. **Products** - Product cards with vendor info & modal
+2. **Vendors** - Vendor Directory with full contact details
+3. **Charts** - Price comparison & source distribution
+4. **Insights** - AI-generated market analysis
+5. **Sources** - Data sources with external links
 
 ## Prioritized Backlog
 
@@ -66,6 +68,7 @@ Build a comprehensive web-based application that enables users to search for any
 - [x] Multi-source results generation
 - [x] Price comparison charts
 - [x] PDF export
+- [x] Vendor details (name, email, phone, address)
 
 ### P1 (High Priority)
 - [ ] Real marketplace API integrations (Amazon, eBay APIs)
@@ -92,6 +95,7 @@ Build a comprehensive web-based application that enables users to search for any
 4. Create price alert notifications system
 
 ## Tech Notes
-- Search results are AI-generated MOCK data for demonstration
+- Search results and vendor details are AI-generated **MOCK data** for demonstration
 - Marketplace links are generated search URLs (functional but not API-powered)
+- Vendor contact info is realistic but simulated
 - PDF export uses html2canvas + jsPDF
