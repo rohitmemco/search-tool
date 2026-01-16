@@ -418,8 +418,12 @@ def generate_search_results(product_data: Dict, location_data: Dict, currency_in
         
         price = round(price, 2)
         
-        # Generate product name
-        product_name = f"{brand} {product_variant}"
+        # Generate product name - avoid duplicate brand names
+        # Check if brand is already in the product variant name
+        if brand.lower() in product_variant.lower():
+            product_name = product_variant
+        else:
+            product_name = f"{brand} {product_variant}"
         
         # Generate image URL
         colors = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
