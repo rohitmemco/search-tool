@@ -712,6 +712,13 @@ class UniversalSearchAPITester:
         print("📊 Testing Additional Endpoints...")
         self.test_recent_searches_endpoint()
         
+        # Dynamic marketplace discovery tests
+        print("🤖 Testing Dynamic Marketplace Discovery...")
+        self.test_dynamic_marketplace_discovery_gaming_laptop()
+        self.test_dynamic_marketplace_discovery_nike_shoes()
+        self.test_dynamic_marketplace_discovery_construction_materials()
+        self.test_different_products_different_sources()
+        
         return True
 
     def print_summary(self):
