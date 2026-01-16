@@ -412,8 +412,101 @@ def get_marketplaces_for_region(country: str, source_type: str) -> List[Dict[str
     country_markets = marketplaces.get(country.lower(), default_marketplaces)
     return country_markets.get(source_type, default_marketplaces[source_type])
 
+def generate_vendor_details(marketplace_name: str, source_type: str, location_data: Dict) -> Dict[str, Any]:
+    """Generate realistic vendor details based on marketplace and location"""
+    
+    # Vendor name prefixes based on source type
+    vendor_prefixes = {
+        "global_suppliers": ["Global", "International", "World", "Premier", "Elite", "Continental", "Universal"],
+        "local_markets": ["City", "Metro", "Local", "Urban", "Neighborhood", "District", "Regional"],
+        "online_marketplaces": ["Digital", "Online", "E-", "Smart", "Quick", "Express", "Prime"]
+    }
+    
+    # Vendor name suffixes
+    vendor_suffixes = ["Traders", "Suppliers", "Distributors", "Enterprises", "Solutions", "Commerce", "Mart", "Hub", "Store", "Deals"]
+    
+    # Generate vendor name
+    prefix = random.choice(vendor_prefixes.get(source_type, vendor_prefixes["online_marketplaces"]))
+    suffix = random.choice(vendor_suffixes)
+    vendor_name = f"{prefix} {suffix}"
+    
+    # Location-specific data
+    country = location_data.get("country", "global").lower()
+    city = location_data.get("city", "Global")
+    
+    # Country-specific address formats and contact info
+    address_data = {
+        "india": {
+            "streets": ["MG Road", "Brigade Road", "Anna Salai", "Park Street", "FC Road", "Linking Road", "Commercial Street"],
+            "areas": ["Industrial Area", "Trade Center", "Business Park", "Market Complex", "Commercial Hub"],
+            "postal_prefix": ["400", "500", "600", "110", "560", "700"],
+            "phone_prefix": "+91",
+            "domain": ".in"
+        },
+        "usa": {
+            "streets": ["Main Street", "Commerce Drive", "Business Boulevard", "Trade Avenue", "Market Street", "Industrial Way"],
+            "areas": ["Business District", "Trade Center", "Commerce Park", "Industrial Zone", "Downtown"],
+            "postal_prefix": ["10", "20", "30", "90", "60", "77"],
+            "phone_prefix": "+1",
+            "domain": ".com"
+        },
+        "uk": {
+            "streets": ["High Street", "Market Lane", "Commerce Road", "Trade Street", "Business Way", "Oxford Street"],
+            "areas": ["Business Centre", "Trade Park", "Commercial Estate", "Industrial Park", "City Centre"],
+            "postal_prefix": ["EC", "WC", "SW", "NW", "SE", "E"],
+            "phone_prefix": "+44",
+            "domain": ".co.uk"
+        },
+        "uae": {
+            "streets": ["Sheikh Zayed Road", "Al Maktoum Street", "Khalid Bin Waleed Road", "Al Rigga Road", "Jumeirah Beach Road"],
+            "areas": ["Business Bay", "Trade Centre", "Industrial City", "Free Zone", "Commercial Tower"],
+            "postal_prefix": [""],
+            "phone_prefix": "+971",
+            "domain": ".ae"
+        }
+    }
+    
+    # Get country-specific data or use default
+    country_data = address_data.get(country, address_data["usa"])
+    
+    # Generate address
+    street_num = random.randint(1, 999)
+    street = random.choice(country_data["streets"])
+    area = random.choice(country_data["areas"])
+    postal = random.choice(country_data["postal_prefix"]) + str(random.randint(100, 999))
+    
+    full_address = f"{street_num} {street}, {area}, {city}, {postal}"
+    
+    # Generate contact details
+    phone_suffix = "".join([str(random.randint(0, 9)) for _ in range(10)])
+    phone = f"{country_data['phone_prefix']} {phone_suffix[:5]} {phone_suffix[5:]}"
+    
+    # Generate email
+    vendor_email_name = vendor_name.lower().replace(" ", "").replace("-", "")
+    email_domains = ["gmail.com", "yahoo.com", f"vendor{country_data['domain']}", f"sales{country_data['domain']}"]
+    email = f"{vendor_email_name}@{random.choice(email_domains)}"
+    
+    # Generate additional details
+    years_in_business = random.randint(2, 25)
+    response_time = random.choice(["Within 1 hour", "Within 24 hours", "1-2 business days", "Same day"])
+    verification_status = random.choice(["Verified Seller", "Premium Vendor", "Trusted Supplier", "Gold Member", "Standard"])
+    
+    return {
+        "vendor_name": vendor_name,
+        "vendor_email": email,
+        "vendor_phone": phone,
+        "vendor_address": full_address,
+        "vendor_city": city,
+        "vendor_country": location_data.get("country", "Global").upper(),
+        "vendor_type": source_type.replace("_", " ").title(),
+        "years_in_business": years_in_business,
+        "response_time": response_time,
+        "verification_status": verification_status,
+        "business_hours": "Mon-Sat: 9:00 AM - 6:00 PM" if source_type == "local_markets" else "24/7 Online Support"
+    }
+
 def generate_search_results(product_data: Dict, location_data: Dict, currency_info: Dict, source_type: str, count: int = 15) -> List[Dict]:
-    """Generate realistic search results"""
+    """Generate realistic search results with vendor details"""
     results = []
     marketplaces = get_marketplaces_for_region(location_data["country"], source_type)
     
@@ -455,6 +548,9 @@ def generate_search_results(product_data: Dict, location_data: Dict, currency_in
         bg_color = random.choice(colors)
         image_text = product_name.replace(" ", "+")[:20]
         
+        # Generate vendor details
+        vendor_details = generate_vendor_details(marketplace["name"], source_type, location_data)
+        
         result = {
             "name": product_name,
             "price": price,
@@ -468,7 +564,9 @@ def generate_search_results(product_data: Dict, location_data: Dict, currency_in
             "unit": unit,
             "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "image": f"https://placehold.co/400x300/{bg_color}/ffffff/png?text={image_text}",
-            "location": f"{location_data['city']}, {location_data['country'].upper()}"
+            "location": f"{location_data['city']}, {location_data['country'].upper()}",
+            # Vendor details
+            "vendor": vendor_details
         }
         results.append(result)
     
