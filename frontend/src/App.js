@@ -893,8 +893,9 @@ const SearchPage = () => {
 
               {/* Tabs for different views */}
               <Tabs defaultValue="products" className="mb-8">
-                <TabsList className="grid w-full grid-cols-4 max-w-md">
+                <TabsList className="grid w-full grid-cols-5 max-w-xl">
                   <TabsTrigger value="products" data-testid="tab-products">Products</TabsTrigger>
+                  <TabsTrigger value="vendors" data-testid="tab-vendors">Vendors</TabsTrigger>
                   <TabsTrigger value="charts" data-testid="tab-charts">Charts</TabsTrigger>
                   <TabsTrigger value="insights" data-testid="tab-insights">Insights</TabsTrigger>
                   <TabsTrigger value="sources" data-testid="tab-sources">Sources</TabsTrigger>
@@ -906,6 +907,10 @@ const SearchPage = () => {
                       <ProductCard key={index} product={product} index={index} />
                     ))}
                   </div>
+                </TabsContent>
+
+                <TabsContent value="vendors" className="mt-6">
+                  <VendorsSection results={searchResults.results} />
                 </TabsContent>
 
                 <TabsContent value="charts" className="mt-6">
