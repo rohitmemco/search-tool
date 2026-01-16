@@ -575,6 +575,77 @@ def generate_search_results(product_data: Dict, location_data: Dict, currency_in
     
     return results
 
+async def generate_search_results_async(product_data: Dict, location_data: Dict, currency_info: Dict, source_type: str, count: int = 15) -> List[Dict]:
+    """Generate realistic search results with dynamic marketplace discovery"""
+    results = []
+    
+    # Use AI to discover relevant marketplaces
+    product_name = product_data.get("product_name", "product")
+    category = product_data.get("category", "General")
+    country = location_data.get("country", "global")
+    
+    marketplaces = await discover_marketplaces_with_ai(product_name, category, country, source_type)
+    
+    products = product_data.get("products", [])
+    brands = product_data.get("brands", [])
+    descriptions = product_data.get("descriptions", [])
+    min_price = product_data.get("price_range_min", 1000)
+    max_price = product_data.get("price_range_max", 50000)
+    unit = product_data.get("unit", "per piece")
+    
+    availability_options = ["In Stock", "In Stock", "In Stock", "Limited Stock", "Pre-Order"]
+    
+    for i in range(count):
+        brand = random.choice(brands) if brands else "Generic"
+        product_variant = random.choice(products) if products else "Standard Model"
+        marketplace = random.choice(marketplaces)
+        
+        # Generate price with variation
+        base_price = random.uniform(min_price, max_price)
+        price = base_price * currency_info["rate"]
+        
+        # Add some price variation based on source type
+        if source_type == "global_suppliers":
+            price *= random.uniform(0.7, 0.9)  # Wholesale prices are lower
+        elif source_type == "local_markets":
+            price *= random.uniform(0.9, 1.1)  # Local prices vary
+        
+        price = round(price, 2)
+        
+        # Generate product name - avoid duplicate brand names
+        if brand.lower() in product_variant.lower():
+            full_product_name = product_variant
+        else:
+            full_product_name = f"{brand} {product_variant}"
+        
+        # Generate image URL
+        colors = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
+        bg_color = random.choice(colors)
+        image_text = full_product_name.replace(" ", "+")[:20]
+        
+        # Generate vendor details
+        vendor_details = generate_vendor_details(marketplace["name"], source_type, location_data)
+        
+        result = {
+            "name": full_product_name,
+            "price": price,
+            "currency_symbol": currency_info["symbol"],
+            "currency_code": currency_info["code"],
+            "source": marketplace["name"],
+            "source_url": f"{marketplace['url']}{full_product_name.replace(' ', '+')}",
+            "description": random.choice(descriptions) if descriptions else "Quality product",
+            "rating": round(random.uniform(3.5, 5.0), 1),
+            "availability": random.choice(availability_options),
+            "unit": unit,
+            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "image": f"https://placehold.co/400x300/{bg_color}/ffffff/png?text={image_text}",
+            "location": f"{location_data['city']}, {location_data['country'].upper()}",
+            "vendor": vendor_details
+        }
+        results.append(result)
+    
+    return results
+
 def generate_analysis(results: List[Dict], product_data: Dict, location_data: Dict, currency_info: Dict) -> str:
     """Generate market analysis text"""
     if not results:
