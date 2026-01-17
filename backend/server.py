@@ -928,6 +928,115 @@ async def get_recent_searches():
     searches = await db.searches.find({}, {"_id": 0}).sort("timestamp", -1).to_list(10)
     return {"searches": searches}
 
+@api_router.post("/similar-products")
+async def get_similar_products(request: dict):
+    """Get AI-powered similar product suggestions"""
+    try:
+        product_name = request.get("product_name", "")
+        category = request.get("category", "General")
+        
+        if not product_name:
+            return {"similar": [], "recommendations": []}
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            return {"similar": [], "recommendations": []}
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"similar-products-{uuid.uuid4()}",
+            system_message="You are a product recommendation expert. Return ONLY valid JSON."
+        )
+        chat.with_model("openai", "gpt-5.2")
+        
+        prompt = f"""Based on the product "{product_name}" in category "{category}", suggest:
+1. Similar products (alternatives/competitors)
+2. Complementary products (often bought together)
+
+Return JSON:
+{{
+    "similar": ["product1", "product2", "product3", "product4", "product5"],
+    "complementary": ["accessory1", "accessory2", "accessory3"],
+    "reasons": {{
+        "similar": "Why these are good alternatives",
+        "complementary": "Why these go well together"
+    }}
+}}"""
+
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        
+        data = json.loads(response_text)
+        return data
+        
+    except Exception as e:
+        logger.error(f"Similar products error: {e}")
+        return {"similar": [], "complementary": [], "reasons": {}}
+
+@api_router.post("/smart-recommendations")
+async def get_smart_recommendations(request: dict):
+    """Get personalized recommendations based on search history"""
+    try:
+        recent_searches = request.get("recent_searches", [])
+        current_product = request.get("current_product", "")
+        
+        if not recent_searches and not current_product:
+            return {"recommendations": [], "trending": []}
+        
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            # Return trending products as fallback
+            return {
+                "recommendations": [],
+                "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones", "Nike Air Max", "Samsung TV"]
+            }
+        
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"recommendations-{uuid.uuid4()}",
+            system_message="You are a shopping recommendation AI. Return ONLY valid JSON."
+        )
+        chat.with_model("openai", "gpt-5.2")
+        
+        search_history = ", ".join(recent_searches[-5:]) if recent_searches else "none"
+        
+        prompt = f"""Based on:
+- Recent searches: {search_history}
+- Current product: {current_product or 'none'}
+
+Suggest personalized product recommendations and trending items.
+
+Return JSON:
+{{
+    "recommendations": [
+        {{"name": "Product Name", "reason": "Why recommended", "category": "Category"}},
+        {{"name": "Product Name", "reason": "Why recommended", "category": "Category"}}
+    ],
+    "trending": ["Trending Product 1", "Trending Product 2", "Trending Product 3"]
+}}
+
+Provide 3-5 recommendations based on their interests."""
+
+        user_message = UserMessage(text=prompt)
+        response = await chat.send_message(user_message)
+        
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        
+        data = json.loads(response_text)
+        return data
+        
+    except Exception as e:
+        logger.error(f"Recommendations error: {e}")
+        return {"recommendations": [], "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones"]}
+
 # Include the router in the main app
 app.include_router(api_router)
 
