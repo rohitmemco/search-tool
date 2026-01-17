@@ -175,6 +175,10 @@ h1, h2, h3, h4, h5, h6 {
     position: relative;
 }
 
+.dark .hero-gradient {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
 .hero-gradient::before {
     content: '';
     position: absolute;
@@ -185,6 +189,11 @@ h1, h2, h3, h4, h5, h6 {
     background: radial-gradient(ellipse at 30% 20%, rgba(37, 99, 235, 0.08) 0%, transparent 50%),
                 radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.08) 0%, transparent 50%);
     pointer-events: none;
+}
+
+.dark .hero-gradient::before {
+    background: radial-gradient(ellipse at 30% 20%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(124, 58, 237, 0.15) 0%, transparent 50%);
 }
 
 /* Card hover effects */
