@@ -433,61 +433,149 @@ def generate_vendor_details(marketplace_name: str, source_type: str, location_da
     suffix = random.choice(vendor_suffixes)
     vendor_name = f"{prefix} {suffix}"
     
-    # Location-specific data
+    # Location-specific data with REAL cities and proper addresses
     country = location_data.get("country", "global").lower()
-    city = location_data.get("city", "Global")
+    detected_city = location_data.get("city", "")
     
-    # Country-specific address formats and contact info
+    # Country-specific address formats with real cities and postal codes
     address_data = {
         "india": {
-            "streets": ["MG Road", "Brigade Road", "Anna Salai", "Park Street", "FC Road", "Linking Road", "Commercial Street"],
-            "areas": ["Industrial Area", "Trade Center", "Business Park", "Market Complex", "Commercial Hub"],
-            "postal_prefix": ["400", "500", "600", "110", "560", "700"],
+            "cities": [
+                {"name": "Mumbai", "state": "Maharashtra", "postal": "400001", "area": "Andheri East"},
+                {"name": "Mumbai", "state": "Maharashtra", "postal": "400069", "area": "Powai"},
+                {"name": "Delhi", "state": "Delhi", "postal": "110001", "area": "Connaught Place"},
+                {"name": "Delhi", "state": "Delhi", "postal": "110020", "area": "Nehru Place"},
+                {"name": "Bangalore", "state": "Karnataka", "postal": "560001", "area": "MG Road"},
+                {"name": "Bangalore", "state": "Karnataka", "postal": "560066", "area": "Electronic City"},
+                {"name": "Chennai", "state": "Tamil Nadu", "postal": "600002", "area": "Anna Salai"},
+                {"name": "Chennai", "state": "Tamil Nadu", "postal": "600032", "area": "Guindy"},
+                {"name": "Hyderabad", "state": "Telangana", "postal": "500034", "area": "HITEC City"},
+                {"name": "Hyderabad", "state": "Telangana", "postal": "500081", "area": "Madhapur"},
+                {"name": "Pune", "state": "Maharashtra", "postal": "411001", "area": "Camp"},
+                {"name": "Pune", "state": "Maharashtra", "postal": "411057", "area": "Hinjewadi"},
+                {"name": "Kolkata", "state": "West Bengal", "postal": "700001", "area": "BBD Bagh"},
+                {"name": "Ahmedabad", "state": "Gujarat", "postal": "380009", "area": "CG Road"},
+            ],
+            "streets": ["MG Road", "Brigade Road", "Anna Salai", "Park Street", "FC Road", "Linking Road", "Commercial Street", "Station Road", "NH Highway", "Ring Road"],
+            "landmarks": ["Near Metro Station", "Opp. City Mall", "Behind Trade Center", "Next to IT Park", "Industrial Estate"],
             "phone_prefix": "+91",
             "domain": ".in"
         },
         "usa": {
-            "streets": ["Main Street", "Commerce Drive", "Business Boulevard", "Trade Avenue", "Market Street", "Industrial Way"],
-            "areas": ["Business District", "Trade Center", "Commerce Park", "Industrial Zone", "Downtown"],
-            "postal_prefix": ["10", "20", "30", "90", "60", "77"],
+            "cities": [
+                {"name": "New York", "state": "NY", "postal": "10001", "area": "Midtown Manhattan"},
+                {"name": "New York", "state": "NY", "postal": "10012", "area": "SoHo"},
+                {"name": "Los Angeles", "state": "CA", "postal": "90001", "area": "Downtown LA"},
+                {"name": "Los Angeles", "state": "CA", "postal": "90210", "area": "Beverly Hills"},
+                {"name": "Chicago", "state": "IL", "postal": "60601", "area": "The Loop"},
+                {"name": "Chicago", "state": "IL", "postal": "60611", "area": "Magnificent Mile"},
+                {"name": "Houston", "state": "TX", "postal": "77001", "area": "Downtown Houston"},
+                {"name": "San Francisco", "state": "CA", "postal": "94102", "area": "Financial District"},
+                {"name": "Seattle", "state": "WA", "postal": "98101", "area": "Downtown Seattle"},
+                {"name": "Boston", "state": "MA", "postal": "02101", "area": "Financial District"},
+                {"name": "Miami", "state": "FL", "postal": "33101", "area": "Downtown Miami"},
+                {"name": "Dallas", "state": "TX", "postal": "75201", "area": "Downtown Dallas"},
+            ],
+            "streets": ["Main Street", "Commerce Drive", "Business Boulevard", "Trade Avenue", "Market Street", "Industrial Way", "Technology Park", "Corporate Center"],
+            "landmarks": ["Suite", "Floor", "Building", "Plaza", "Tower"],
             "phone_prefix": "+1",
             "domain": ".com"
         },
         "uk": {
-            "streets": ["High Street", "Market Lane", "Commerce Road", "Trade Street", "Business Way", "Oxford Street"],
-            "areas": ["Business Centre", "Trade Park", "Commercial Estate", "Industrial Park", "City Centre"],
-            "postal_prefix": ["EC", "WC", "SW", "NW", "SE", "E"],
+            "cities": [
+                {"name": "London", "state": "England", "postal": "EC1A 1BB", "area": "City of London"},
+                {"name": "London", "state": "England", "postal": "W1D 3QU", "area": "West End"},
+                {"name": "London", "state": "England", "postal": "E14 5AB", "area": "Canary Wharf"},
+                {"name": "Manchester", "state": "England", "postal": "M1 1AD", "area": "City Centre"},
+                {"name": "Birmingham", "state": "England", "postal": "B1 1AA", "area": "City Centre"},
+                {"name": "Leeds", "state": "England", "postal": "LS1 1AA", "area": "City Centre"},
+                {"name": "Glasgow", "state": "Scotland", "postal": "G1 1AA", "area": "City Centre"},
+                {"name": "Edinburgh", "state": "Scotland", "postal": "EH1 1AA", "area": "Old Town"},
+            ],
+            "streets": ["High Street", "Market Lane", "Commerce Road", "Trade Street", "Business Way", "Oxford Street", "King Street", "Queen Street"],
+            "landmarks": ["Unit", "Floor", "Building", "House", "Centre"],
             "phone_prefix": "+44",
             "domain": ".co.uk"
         },
         "uae": {
-            "streets": ["Sheikh Zayed Road", "Al Maktoum Street", "Khalid Bin Waleed Road", "Al Rigga Road", "Jumeirah Beach Road"],
-            "areas": ["Business Bay", "Trade Centre", "Industrial City", "Free Zone", "Commercial Tower"],
-            "postal_prefix": [""],
+            "cities": [
+                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 12345", "area": "Business Bay"},
+                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 23456", "area": "DIFC"},
+                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 34567", "area": "Deira"},
+                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 45678", "area": "Jumeirah"},
+                {"name": "Abu Dhabi", "state": "Abu Dhabi", "postal": "P.O. Box 56789", "area": "Al Reem Island"},
+                {"name": "Abu Dhabi", "state": "Abu Dhabi", "postal": "P.O. Box 67890", "area": "Corniche"},
+                {"name": "Sharjah", "state": "Sharjah", "postal": "P.O. Box 78901", "area": "Industrial Area"},
+            ],
+            "streets": ["Sheikh Zayed Road", "Al Maktoum Street", "Khalid Bin Waleed Road", "Al Rigga Road", "Jumeirah Beach Road", "Al Wasl Road"],
+            "landmarks": ["Office", "Tower", "Building", "Centre", "Plaza"],
             "phone_prefix": "+971",
             "domain": ".ae"
         }
     }
     
-    # Get country-specific data or use default
+    # Get country-specific data or use USA as default
     country_data = address_data.get(country, address_data["usa"])
     
-    # Generate address
-    street_num = random.randint(1, 999)
+    # Select a real city - prefer detected city or random from country
+    city_info = None
+    if detected_city and detected_city not in ["Various Cities", "Global", "Nationwide"]:
+        # Try to find the detected city in our data
+        for c in country_data["cities"]:
+            if detected_city.lower() in c["name"].lower():
+                city_info = c
+                break
+    
+    # If no match, pick a random city from the country
+    if not city_info:
+        city_info = random.choice(country_data["cities"])
+    
+    # Generate realistic address
+    street_num = random.randint(1, 500)
     street = random.choice(country_data["streets"])
-    area = random.choice(country_data["areas"])
-    postal = random.choice(country_data["postal_prefix"]) + str(random.randint(100, 999))
+    landmark = random.choice(country_data["landmarks"])
     
-    full_address = f"{street_num} {street}, {area}, {city}, {postal}"
+    if country == "usa":
+        # US format: 123 Main Street, Suite 456, Area, City, State ZIP
+        suite_num = random.randint(100, 999)
+        full_address = f"{street_num} {street}, {landmark} {suite_num}, {city_info['area']}, {city_info['name']}, {city_info['state']} {city_info['postal']}"
+    elif country == "uk":
+        # UK format: Unit 12, 123 High Street, Area, City, Postal
+        unit_num = random.randint(1, 50)
+        full_address = f"{landmark} {unit_num}, {street_num} {street}, {city_info['area']}, {city_info['name']}, {city_info['postal']}"
+    elif country == "uae":
+        # UAE format: Office 123, Tower Name, Street, Area, City, P.O. Box
+        office_num = random.randint(100, 999)
+        full_address = f"{landmark} {office_num}, {street_num} {street}, {city_info['area']}, {city_info['name']}, {city_info['postal']}"
+    else:
+        # India/Default format: 123, Street Name, Area, Near Landmark, City, State - PIN
+        full_address = f"{street_num}, {street}, {city_info['area']}, {landmark}, {city_info['name']}, {city_info['state']} - {city_info['postal']}"
     
-    # Generate contact details
-    phone_suffix = "".join([str(random.randint(0, 9)) for _ in range(10)])
-    phone = f"{country_data['phone_prefix']} {phone_suffix[:5]} {phone_suffix[5:]}"
+    # Generate contact details with proper formatting
+    if country == "india":
+        # Indian mobile: +91 98765 43210
+        phone = f"+91 {random.randint(70000, 99999)} {random.randint(10000, 99999)}"
+    elif country == "usa":
+        # US format: +1 (555) 123-4567
+        phone = f"+1 ({random.randint(200, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}"
+    elif country == "uk":
+        # UK format: +44 20 1234 5678
+        phone = f"+44 {random.randint(20, 79)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
+    elif country == "uae":
+        # UAE format: +971 4 123 4567
+        phone = f"+971 {random.choice(['4', '2', '6'])} {random.randint(100, 999)} {random.randint(1000, 9999)}"
+    else:
+        phone = f"+1 ({random.randint(200, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}"
     
-    # Generate email
+    # Generate business email
     vendor_email_name = vendor_name.lower().replace(" ", "").replace("-", "")
-    email_domains = ["gmail.com", "yahoo.com", f"vendor{country_data['domain']}", f"sales{country_data['domain']}"]
-    email = f"{vendor_email_name}@{random.choice(email_domains)}"
+    business_domains = [
+        f"sales{country_data.get('domain', '.com')}",
+        f"info{country_data.get('domain', '.com')}",
+        f"{vendor_email_name[:10]}{country_data.get('domain', '.com')}",
+        "gmail.com"
+    ]
+    email = f"{vendor_email_name}@{random.choice(business_domains)}"
     
     # Generate additional details
     years_in_business = random.randint(2, 25)
@@ -499,7 +587,7 @@ def generate_vendor_details(marketplace_name: str, source_type: str, location_da
         "vendor_email": email,
         "vendor_phone": phone,
         "vendor_address": full_address,
-        "vendor_city": city,
+        "vendor_city": city_info["name"],
         "vendor_country": location_data.get("country", "Global").upper(),
         "vendor_type": source_type.replace("_", " ").title(),
         "years_in_business": years_in_business,
