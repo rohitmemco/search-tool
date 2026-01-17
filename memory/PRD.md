@@ -120,6 +120,14 @@ Build a comprehensive web-based application that enables users to search for any
 3. Add advanced filtering options
 4. Create price alert notifications system
 
+## Documentation
+
+All documentation is available in `/app/docs/`:
+
+1. **COMPLETE_DOCUMENTATION.md** - Full documentation for non-coders to rebuild the app
+2. **QUICK_REBUILD_GUIDE.md** - Step-by-step prompts for AI tools
+3. **TECHNICAL_SPECIFICATION.md** - Developer reference with API specs
+
 ## Tech Notes
 - Search results and vendor details are AI-generated **MOCK data** for demonstration
 - Marketplace links are generated search URLs (functional but not API-powered)
