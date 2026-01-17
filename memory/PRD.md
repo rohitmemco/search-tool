@@ -53,6 +53,25 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **New Vendors Tab** showing Vendor Directory with all vendor contact info
 - ✅ Region-specific vendor data (India, USA, UK, UAE addresses)
 - ✅ Clickable email and phone links
+### Jan 17, 2026 - 15 New Features Added
+- ✅ **Product Comparison** - Compare up to 4 products side-by-side with floating compare button
+- ✅ **Advanced Filters & Sort** - Filter by price range, rating, availability, source type; Sort by price/rating/name
+- ✅ **Favorites/Wishlist** - Save products to favorites (localStorage), view in modal
+- ✅ **Search History** - Recent searches saved locally with one-click re-search
+- ✅ **Currency Switcher** - Toggle between INR, USD, GBP, EUR, AED with live conversion
+- ✅ **Price Range Slider** - Visual slider to filter results by price
+- ✅ **Best Deals Badge** - Products with best price-to-rating ratio get "Best Deal" badge
+- ✅ **Lowest Price Badge** - Products with lowest price get "Lowest Price" badge
+- ✅ **Price Distribution Chart** - Area chart showing price distribution across ranges
+- ✅ **Dark Mode Toggle** - Full dark theme support
+- ✅ **Share Results** - Copy link, share to Twitter/WhatsApp
+- ✅ **Export to Excel** - Download results as CSV file
+- ✅ **Grid/List View Toggle** - Switch between card grid and compact list view
+- ✅ **Similar Products** - AI-powered similar product suggestions
+- ✅ **Smart Recommendations** - Personalized recommendations based on search history
+- ✅ **Voice Search** - Search using microphone input (Web Speech API)
+
+### Jan 17, 2026 - Vendor Address Fix
 
 ## API Endpoints
 - `GET /api/` - API info
