@@ -349,8 +349,18 @@ const FilterPanel = ({
   onFiltersChange, 
   availableSources, 
   priceRange,
-  onReset 
+  onReset,
+  advancedFilters
 }) => {
+  const hasAdvancedFilters = advancedFilters && (
+    advancedFilters.models?.length > 0 ||
+    advancedFilters.colors?.length > 0 ||
+    advancedFilters.sizes?.length > 0 ||
+    advancedFilters.brands?.length > 0 ||
+    advancedFilters.materials?.length > 0 ||
+    Object.keys(advancedFilters.specifications || {}).length > 0
+  );
+
   return (
     <Card className="p-4 dark:bg-slate-800 dark:border-slate-700">
       <div className="flex items-center justify-between mb-4">
@@ -430,6 +440,179 @@ const FilterPanel = ({
             ))}
           </div>
         </div>
+
+        {/* Advanced Filters Section */}
+        {hasAdvancedFilters && (
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              Product Specific Filters
+            </h4>
+            
+            {/* Brand Filter */}
+            {advancedFilters.brands?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Brand</span>
+                <Select 
+                  value={filters.selectedBrand || "all"} 
+                  onValueChange={(value) => onFiltersChange({ ...filters, selectedBrand: value === "all" ? null : value })}
+                >
+                  <SelectTrigger className="w-full" data-testid="brand-filter">
+                    <SelectValue placeholder="All Brands" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Brands</SelectItem>
+                    {advancedFilters.brands.map(brand => (
+                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {/* Model Filter */}
+            {advancedFilters.models?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Model</span>
+                <Select 
+                  value={filters.selectedModel || "all"} 
+                  onValueChange={(value) => onFiltersChange({ ...filters, selectedModel: value === "all" ? null : value })}
+                >
+                  <SelectTrigger className="w-full" data-testid="model-filter">
+                    <SelectValue placeholder="All Models" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Models</SelectItem>
+                    {advancedFilters.models.map(model => (
+                      <SelectItem key={model} value={model}>{model}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {/* Color Filter */}
+            {advancedFilters.colors?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Color</span>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={!filters.selectedColor ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => onFiltersChange({ ...filters, selectedColor: null })}
+                    className="text-xs"
+                    data-testid="color-filter-all"
+                  >
+                    All
+                  </Button>
+                  {advancedFilters.colors.map(color => (
+                    <Button
+                      key={color}
+                      variant={filters.selectedColor === color ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => onFiltersChange({ ...filters, selectedColor: color })}
+                      className="text-xs gap-1"
+                      data-testid={`color-filter-${color.toLowerCase()}`}
+                    >
+                      <span 
+                        className="w-3 h-3 rounded-full border border-slate-300" 
+                        style={{ backgroundColor: color.toLowerCase() === 'white' ? '#f8fafc' : color.toLowerCase() }}
+                      />
+                      {color}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Size Filter */}
+            {advancedFilters.sizes?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Size</span>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={!filters.selectedSize ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => onFiltersChange({ ...filters, selectedSize: null })}
+                    className="text-xs"
+                    data-testid="size-filter-all"
+                  >
+                    All
+                  </Button>
+                  {advancedFilters.sizes.map(size => (
+                    <Button
+                      key={size}
+                      variant={filters.selectedSize === size ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => onFiltersChange({ ...filters, selectedSize: size })}
+                      className="text-xs"
+                      data-testid={`size-filter-${size}`}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Material Filter */}
+            {advancedFilters.materials?.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <span className="text-sm text-slate-600 dark:text-slate-400">Material</span>
+                <Select 
+                  value={filters.selectedMaterial || "all"} 
+                  onValueChange={(value) => onFiltersChange({ ...filters, selectedMaterial: value === "all" ? null : value })}
+                >
+                  <SelectTrigger className="w-full" data-testid="material-filter">
+                    <SelectValue placeholder="All Materials" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Materials</SelectItem>
+                    {advancedFilters.materials.map(material => (
+                      <SelectItem key={material} value={material}>{material}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
+            {/* Dynamic Specifications Filters */}
+            {advancedFilters.specifications && Object.keys(advancedFilters.specifications).length > 0 && (
+              <div className="space-y-4">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Specifications</span>
+                {Object.entries(advancedFilters.specifications).map(([specName, specOptions]) => (
+                  specOptions && specOptions.length > 0 && (
+                    <div key={specName} className="space-y-2">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{specName}</span>
+                      <Select 
+                        value={filters.selectedSpecs?.[specName] || "all"} 
+                        onValueChange={(value) => {
+                          const newSpecs = { ...(filters.selectedSpecs || {}) };
+                          if (value === "all") {
+                            delete newSpecs[specName];
+                          } else {
+                            newSpecs[specName] = value;
+                          }
+                          onFiltersChange({ ...filters, selectedSpecs: newSpecs });
+                        }}
+                      >
+                        <SelectTrigger className="w-full" data-testid={`spec-filter-${specName.toLowerCase().replace(/\s+/g, '-')}`}>
+                          <SelectValue placeholder={`All ${specName}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All {specName}</SelectItem>
+                          {specOptions.map(option => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );
