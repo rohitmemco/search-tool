@@ -1690,7 +1690,26 @@ const SearchPage = () => {
     const meetsPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1];
     const meetsRating = r.rating >= filters.minRating;
     const meetsAvailability = filters.availability.includes(r.availability);
-    return meetsPrice && meetsRating && meetsAvailability;
+    
+    // Advanced filters
+    const meetsBrand = !filters.selectedBrand || r.brand === filters.selectedBrand;
+    const meetsModel = !filters.selectedModel || r.model === filters.selectedModel;
+    const meetsColor = !filters.selectedColor || r.color === filters.selectedColor;
+    const meetsSize = !filters.selectedSize || r.size === filters.selectedSize;
+    const meetsMaterial = !filters.selectedMaterial || r.material === filters.selectedMaterial;
+    
+    // Check specifications
+    let meetsSpecs = true;
+    if (filters.selectedSpecs && Object.keys(filters.selectedSpecs).length > 0) {
+      for (const [specName, specValue] of Object.entries(filters.selectedSpecs)) {
+        if (r.specifications && r.specifications[specName] !== specValue) {
+          meetsSpecs = false;
+          break;
+        }
+      }
+    }
+    
+    return meetsPrice && meetsRating && meetsAvailability && meetsBrand && meetsModel && meetsColor && meetsSize && meetsMaterial && meetsSpecs;
   }).sort((a, b) => {
     switch (sortBy) {
       case "price-low": return a.price - b.price;
