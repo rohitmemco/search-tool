@@ -719,15 +719,15 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
     try:
         # Map country to Google Shopping parameters
         country_params = {
-            "india": {"gl": "in", "hl": "en", "location": "India", "currency": "INR"},
-            "usa": {"gl": "us", "hl": "en", "location": "United States", "currency": "USD"},
-            "uk": {"gl": "uk", "hl": "en", "location": "United Kingdom", "currency": "GBP"},
-            "uae": {"gl": "ae", "hl": "en", "location": "United Arab Emirates", "currency": "AED"},
-            "europe": {"gl": "de", "hl": "en", "location": "Germany", "currency": "EUR"},
-            "japan": {"gl": "jp", "hl": "en", "location": "Japan", "currency": "JPY"},
-            "australia": {"gl": "au", "hl": "en", "location": "Australia", "currency": "AUD"},
-            "canada": {"gl": "ca", "hl": "en", "location": "Canada", "currency": "CAD"},
-            "global": {"gl": "us", "hl": "en", "location": "United States", "currency": "USD"}
+            "india": {"gl": "in", "hl": "en", "location": "India", "currency": "INR", "country": "india"},
+            "usa": {"gl": "us", "hl": "en", "location": "United States", "currency": "USD", "country": "usa"},
+            "uk": {"gl": "uk", "hl": "en", "location": "United Kingdom", "currency": "GBP", "country": "uk"},
+            "uae": {"gl": "ae", "hl": "en", "location": "United Arab Emirates", "currency": "AED", "country": "uae"},
+            "europe": {"gl": "de", "hl": "en", "location": "Germany", "currency": "EUR", "country": "europe"},
+            "japan": {"gl": "jp", "hl": "en", "location": "Japan", "currency": "JPY", "country": "japan"},
+            "australia": {"gl": "au", "hl": "en", "location": "Australia", "currency": "AUD", "country": "australia"},
+            "canada": {"gl": "ca", "hl": "en", "location": "Canada", "currency": "CAD", "country": "canada"},
+            "global": {"gl": "us", "hl": "en", "location": "United States", "currency": "USD", "country": "usa"}
         }
         
         params = country_params.get(country.lower(), country_params["india"])
@@ -751,17 +751,26 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
         products = []
         currency_symbol = "₹" if params["currency"] == "INR" else "$" if params["currency"] == "USD" else params["currency"]
         
+        # Location data for vendor generation
+        location_data = {
+            "city": params["location"].split(",")[0] if "," in params["location"] else params["location"],
+            "country": params["country"]
+        }
+        
         # Parse inline shopping results (featured products at top)
         if "inline_shopping_results" in api_response:
             for idx, item in enumerate(api_response["inline_shopping_results"]):
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
+                    source_name = item.get("source", "Google Shopping")
+                    vendor_details = generate_vendor_for_real_source(source_name, location_data, price)
+                    
                     products.append({
                         "name": item.get("title", "Unknown Product"),
                         "price": float(price),
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
-                        "source": item.get("source", "Google Shopping"),
+                        "source": source_name,
                         "source_url": item.get("link", ""),
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating", 0) or round(random.uniform(3.5, 5.0), 1),
@@ -772,7 +781,8 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "location": params["location"],
                         "review_count": item.get("reviews", 0),
                         "position": idx + 1,
-                        "is_real_data": True
+                        "is_real_data": True,
+                        "vendor": vendor_details
                     })
         
         # Parse main shopping results
@@ -780,12 +790,15 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
             for idx, item in enumerate(api_response["shopping_results"]):
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
+                    source_name = item.get("source", "Google Shopping")
+                    vendor_details = generate_vendor_for_real_source(source_name, location_data, price)
+                    
                     products.append({
                         "name": item.get("title", "Unknown Product"),
                         "price": float(price),
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
-                        "source": item.get("source", "Google Shopping"),
+                        "source": source_name,
                         "source_url": item.get("product_link", item.get("link", "")),
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating", 0) or round(random.uniform(3.5, 5.0), 1),
@@ -796,7 +809,8 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "location": params["location"],
                         "review_count": item.get("reviews", 0),
                         "position": len(products) + 1,
-                        "is_real_data": True
+                        "is_real_data": True,
+                        "vendor": vendor_details
                     })
         
         logger.info(f"SerpAPI returned {len(products)} real products")
