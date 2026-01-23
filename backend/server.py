@@ -357,9 +357,11 @@ def fallback_product_detection(query: str) -> Dict[str, Any]:
         }
     }
     
-    # Find matching category
+    # Find matching category - prioritize more specific matches first
+    # Sort keys by length (longest first) to match "iphone" before "phone"
     matched_category = None
-    for key in categories:
+    sorted_keys = sorted(categories.keys(), key=len, reverse=True)
+    for key in sorted_keys:
         if key in query_lower:
             matched_category = key
             break
