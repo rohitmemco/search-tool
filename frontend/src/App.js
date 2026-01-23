@@ -1795,7 +1795,13 @@ const SearchPage = () => {
         priceRange: [Math.min(...prices), Math.max(...prices)],
         minRating: 0,
         availability: ["In Stock", "Limited Stock", "Pre-Order"],
-        sourceTypes: ["Global Suppliers", "Local Markets", "Online Marketplaces"]
+        sourceTypes: ["Global Suppliers", "Local Markets", "Online Marketplaces"],
+        selectedBrand: null,
+        selectedModel: null,
+        selectedColor: null,
+        selectedSize: null,
+        selectedMaterial: null,
+        selectedSpecs: {}
       });
     }
   };
