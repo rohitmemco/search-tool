@@ -1991,7 +1991,7 @@ const SearchPage = () => {
               <AnimatePresence>
                 {showFilters && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mb-6">
-                    <FilterPanel filters={filters} onFiltersChange={setFilters} availableSources={[]} priceRange={priceRange} onReset={resetFilters} />
+                    <FilterPanel filters={filters} onFiltersChange={setFilters} availableSources={[]} priceRange={priceRange} onReset={resetFilters} advancedFilters={advancedFilters} />
                   </motion.div>
                 )}
               </AnimatePresence>
