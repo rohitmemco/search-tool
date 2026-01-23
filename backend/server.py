@@ -990,6 +990,102 @@ async def generate_search_results_async(product_data: Dict, location_data: Dict,
     
     return results
 
+def extract_filters_from_real_data(results: List[Dict]) -> Dict[str, Any]:
+    """Extract filter options from real product data"""
+    sources = list(set([r.get("source", "") for r in results if r.get("source")]))
+    
+    # Extract price range
+    prices = [r.get("price", 0) for r in results if r.get("price", 0) > 0]
+    
+    return {
+        "models": [],  # Real data doesn't have structured model info
+        "colors": [],
+        "sizes": [],
+        "specifications": {},
+        "materials": [],
+        "brands": [],
+        "sources": sources,
+        "price_range": {
+            "min": min(prices) if prices else 0,
+            "max": max(prices) if prices else 0
+        },
+        "category": "Real Products"
+    }
+
+def generate_real_data_analysis(results: List[Dict], query: str, location_data: Dict, currency_info: Dict) -> str:
+    """Generate market analysis for real product data from SerpAPI"""
+    if not results:
+        return "## No Results Found\n\nNo products found matching your search."
+    
+    prices = [r.get("price", 0) for r in results if r.get("price", 0) > 0]
+    if not prices:
+        return "## Results Found\n\nProducts found but price data unavailable."
+    
+    min_price = min(prices)
+    max_price = max(prices)
+    avg_price = sum(prices) / len(prices)
+    
+    # Find products with ratings
+    rated_products = [r for r in results if r.get("rating", 0) > 0]
+    best_rated = max(rated_products, key=lambda x: x.get("rating", 0)) if rated_products else None
+    
+    # Find cheapest product
+    cheapest = min(results, key=lambda x: x.get("price", float('inf'))) if results else None
+    
+    # Get unique sources
+    sources = list(set([r.get("source", "Unknown") for r in results]))
+    
+    symbol = currency_info.get("symbol", "₹")
+    
+    analysis = f"""# Live Prices for: {query}
+
+## 🔴 REAL-TIME DATA from Google Shopping
+
+**Data Source**: Live prices from {len(sources)} marketplace(s)
+**Last Updated**: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}
+
+---
+
+## 💰 Price Summary
+- **Lowest Price**: {symbol}{min_price:,.0f}
+- **Highest Price**: {symbol}{max_price:,.0f}
+- **Average Price**: {symbol}{avg_price:,.0f}
+- **You Save Up To**: {symbol}{max_price - min_price:,.0f} ({((max_price - min_price) / max_price * 100):.0f}%)
+
+## 📊 Market Analysis
+
+### Where to Buy
+Found **{len(results)} listings** from: {', '.join(sources[:5])}{'...' if len(sources) > 5 else ''}
+
+"""
+    
+    if cheapest:
+        analysis += f"""### 💡 Best Price
+**{cheapest.get('name', 'Product')[:60]}{'...' if len(cheapest.get('name', '')) > 60 else ''}**
+- Price: {symbol}{cheapest.get('price', 0):,.0f}
+- From: {cheapest.get('source', 'Unknown')}
+- [View Deal]({cheapest.get('source_url', '#')})
+
+"""
+    
+    if best_rated:
+        analysis += f"""### ⭐ Top Rated
+**{best_rated.get('name', 'Product')[:60]}{'...' if len(best_rated.get('name', '')) > 60 else ''}**
+- Rating: {best_rated.get('rating', 0)}⭐ ({best_rated.get('review_count', 0)} reviews)
+- Price: {symbol}{best_rated.get('price', 0):,.0f}
+- From: {best_rated.get('source', 'Unknown')}
+
+"""
+    
+    analysis += """### 🛒 Buying Tips
+1. Click "View" to go directly to the seller's page
+2. Prices update in real-time from Google Shopping
+3. Check seller ratings before purchasing
+4. Compare shipping costs at checkout
+"""
+    
+    return analysis
+
 def generate_analysis(results: List[Dict], product_data: Dict, location_data: Dict, currency_info: Dict) -> str:
     """Generate market analysis text"""
     if not results:
