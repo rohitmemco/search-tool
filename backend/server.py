@@ -69,6 +69,8 @@ class SearchResponse(BaseModel):
     results_count: int
     ai_model: str
     data_sources: List[Dict[str, Any]]
+    # Advanced filter options extracted from AI
+    available_filters: Optional[Dict[str, Any]] = None
 
 # ================== CURRENCY DATA ==================
 CURRENCY_DATA = {
@@ -698,6 +700,13 @@ async def generate_search_results_async(product_data: Dict, location_data: Dict,
     max_price = product_data.get("price_range_max", 50000)
     unit = product_data.get("unit", "per piece")
     
+    # Get advanced product attributes from AI
+    models = product_data.get("models", [])
+    colors = product_data.get("colors", [])
+    sizes = product_data.get("sizes", [])
+    specifications = product_data.get("specifications", {})
+    materials = product_data.get("materials", [])
+    
     availability_options = ["In Stock", "In Stock", "In Stock", "Limited Stock", "Pre-Order"]
     
     for i in range(count):
@@ -705,8 +714,35 @@ async def generate_search_results_async(product_data: Dict, location_data: Dict,
         product_variant = random.choice(products) if products else "Standard Model"
         marketplace = random.choice(marketplaces)
         
-        # Generate price with variation
+        # Select random advanced attributes
+        selected_model = random.choice(models) if models else None
+        selected_color = random.choice(colors) if colors else None
+        selected_size = random.choice(sizes) if sizes else None
+        selected_material = random.choice(materials) if materials else None
+        
+        # Build dynamic specifications for this product
+        product_specs = {}
+        if specifications:
+            for spec_name, spec_options in specifications.items():
+                if spec_options and isinstance(spec_options, list):
+                    product_specs[spec_name] = random.choice(spec_options)
+        
+        # Generate price with variation based on specs
         base_price = random.uniform(min_price, max_price)
+        
+        # Adjust price based on specifications (premium specs cost more)
+        if product_specs:
+            spec_values = list(product_specs.values())
+            if spec_values:
+                # Higher spec options (later in list) tend to cost more
+                for spec_name, spec_value in product_specs.items():
+                    if spec_name in specifications:
+                        spec_list = specifications[spec_name]
+                        if spec_value in spec_list:
+                            idx = spec_list.index(spec_value)
+                            price_multiplier = 1 + (idx * 0.1)  # 10% increase per tier
+                            base_price *= min(price_multiplier, 1.5)  # Cap at 50% increase
+        
         price = base_price * currency_info["rate"]
         
         # Add some price variation based on source type
@@ -723,9 +759,13 @@ async def generate_search_results_async(product_data: Dict, location_data: Dict,
         else:
             full_product_name = f"{brand} {product_variant}"
         
+        # Add model to name if available
+        if selected_model and selected_model.lower() not in full_product_name.lower():
+            full_product_name = f"{full_product_name} {selected_model}"
+        
         # Generate image URL
-        colors = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
-        bg_color = random.choice(colors)
+        color_codes = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
+        bg_color = random.choice(color_codes)
         image_text = full_product_name.replace(" ", "+")[:20]
         
         # Generate vendor details
@@ -745,7 +785,15 @@ async def generate_search_results_async(product_data: Dict, location_data: Dict,
             "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "image": f"https://placehold.co/400x300/{bg_color}/ffffff/png?text={image_text}",
             "location": f"{location_data['city']}, {location_data['country'].upper()}",
-            "vendor": vendor_details
+            "vendor": vendor_details,
+            # Advanced attributes
+            "model": selected_model,
+            "color": selected_color,
+            "size": selected_size,
+            "material": selected_material,
+            "specifications": product_specs,
+            "brand": brand,
+            "category": category
         }
         results.append(result)
     
@@ -922,6 +970,17 @@ This might be because:
         }
         await db.searches.insert_one(search_doc)
         
+        # Extract available filter options from product data for frontend
+        available_filters = {
+            "models": product_data.get("models", []),
+            "colors": product_data.get("colors", []),
+            "sizes": product_data.get("sizes", []),
+            "specifications": product_data.get("specifications", {}),
+            "materials": product_data.get("materials", []),
+            "brands": product_data.get("brands", []),
+            "category": product_data.get("category", "General")
+        }
+        
         return SearchResponse(
             success=True,
             query=query,
@@ -930,7 +989,8 @@ This might be because:
             results=all_results,
             results_count=len(all_results),
             ai_model="gpt-5.2",
-            data_sources=data_sources
+            data_sources=data_sources,
+            available_filters=available_filters
         )
         
     except HTTPException:
