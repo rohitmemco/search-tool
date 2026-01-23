@@ -1729,19 +1729,33 @@ const SearchPage = () => {
 
     setIsLoading(true);
     setSearchResults(null);
+    setAdvancedFilters(null);
 
     try {
       const response = await axios.post(`${API}/search`, { query: q.trim(), max_results: 50 });
       setSearchResults(response.data);
       addToHistory(q.trim());
       
+      // Store advanced filters from response
+      if (response.data.available_filters) {
+        setAdvancedFilters(response.data.available_filters);
+      }
+      
       // Reset filters to match new results
       if (response.data.results?.length > 0) {
         const prices = response.data.results.map(r => r.price);
-        setFilters(prev => ({
-          ...prev,
-          priceRange: [Math.min(...prices), Math.max(...prices)]
-        }));
+        setFilters({
+          priceRange: [Math.min(...prices), Math.max(...prices)],
+          minRating: 0,
+          availability: ["In Stock", "Limited Stock", "Pre-Order"],
+          sourceTypes: ["Global Suppliers", "Local Markets", "Online Marketplaces"],
+          selectedBrand: null,
+          selectedModel: null,
+          selectedColor: null,
+          selectedSize: null,
+          selectedMaterial: null,
+          selectedSpecs: {}
+        });
       }
       
       if (response.data.success) {
