@@ -1666,8 +1666,18 @@ const SearchPage = () => {
     priceRange: [0, 1000000],
     minRating: 0,
     availability: ["In Stock", "Limited Stock", "Pre-Order"],
-    sourceTypes: ["Global Suppliers", "Local Markets", "Online Marketplaces"]
+    sourceTypes: ["Global Suppliers", "Local Markets", "Online Marketplaces"],
+    // Advanced filters
+    selectedBrand: null,
+    selectedModel: null,
+    selectedColor: null,
+    selectedSize: null,
+    selectedMaterial: null,
+    selectedSpecs: {}
   });
+  
+  // Store available advanced filters from search results
+  const [advancedFilters, setAdvancedFilters] = useState(null);
 
   // Calculate price range from results
   const priceRange = searchResults?.results?.length > 0
