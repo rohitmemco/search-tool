@@ -190,6 +190,15 @@ Return a JSON object with exactly this structure (no markdown, no code blocks):
     "product_name": "main product name",
     "products": ["variation 1", "variation 2", "variation 3", "variation 4", "variation 5"],
     "brands": ["brand1", "brand2", "brand3", "brand4", "brand5"],
+    "models": ["Model A", "Model B Pro", "Model C Plus", "Model D Max", "Model E Lite"],
+    "colors": ["Black", "White", "Silver", "Blue", "Red", "Gold", "Green"],
+    "sizes": ["Small", "Medium", "Large", "XL", "XXL"] or ["32GB", "64GB", "128GB", "256GB", "512GB"] or ["13 inch", "14 inch", "15 inch", "17 inch"] or appropriate sizes for the product,
+    "specifications": {{
+        "spec_type_1": ["option1", "option2", "option3"],
+        "spec_type_2": ["option1", "option2", "option3"],
+        "spec_type_3": ["option1", "option2", "option3"]
+    }},
+    "materials": ["Material 1", "Material 2", "Material 3"],
     "price_range_min": minimum typical price in INR (0 if not searchable),
     "price_range_max": maximum typical price in INR (0 if not searchable),
     "unit": "per piece" or "per kg" or appropriate unit,
@@ -197,14 +206,22 @@ Return a JSON object with exactly this structure (no markdown, no code blocks):
     "category": "Electronics/Fashion/Home/Construction/Food/etc"
 }}
 
+SPECIFICATION EXAMPLES BY CATEGORY:
+- Electronics (laptops): {{"RAM": ["4GB", "8GB", "16GB", "32GB"], "Storage": ["256GB SSD", "512GB SSD", "1TB SSD"], "Processor": ["Intel i3", "Intel i5", "Intel i7", "AMD Ryzen 5", "AMD Ryzen 7"]}}
+- Electronics (phones): {{"Storage": ["64GB", "128GB", "256GB"], "RAM": ["4GB", "6GB", "8GB", "12GB"], "Camera": ["12MP", "48MP", "64MP", "108MP"]}}
+- Fashion (clothing): {{"Fit": ["Slim Fit", "Regular Fit", "Loose Fit"], "Fabric": ["Cotton", "Polyester", "Linen", "Wool"], "Style": ["Casual", "Formal", "Sports"]}}
+- Fashion (shoes): {{"Type": ["Running", "Casual", "Formal", "Sports"], "Sole": ["Rubber", "EVA", "Leather"], "Closure": ["Lace-up", "Slip-on", "Velcro"]}}
+- Home/Furniture: {{"Material": ["Wood", "Metal", "Plastic", "Glass"], "Style": ["Modern", "Traditional", "Minimalist"], "Assembly": ["Pre-assembled", "DIY Assembly"]}}
+
 CRITICAL RULES:
 - Set is_searchable to FALSE for anything fictional, mythical, impossible, or not commercially sold
 - DO NOT try to find creative alternatives or similar real products
 - If the exact product doesn't exist in real markets, is_searchable MUST be false
-- Examples of NOT searchable: unicorn dust, dragon scales, magic wands, time machines, fictional items
-- Only set is_searchable to TRUE for real, tangible products sold in actual stores
-- Provide 5 real product variations with different specs/models (only if searchable)
-- Provide 5 real brands that make this product (only if searchable)
+- Provide product-appropriate sizes (clothing sizes for clothes, storage sizes for electronics, screen sizes for TVs/laptops)
+- Provide realistic specifications based on product category
+- Provide realistic colors that the product actually comes in
+- Provide 5 real product variations with different specs/models
+- Provide 5 real brands that make this product
 - Provide realistic price ranges in Indian Rupees (INR)"""
 
         user_message = UserMessage(text=prompt)
