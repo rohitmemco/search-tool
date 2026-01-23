@@ -248,37 +248,112 @@ def fallback_product_detection(query: str) -> Dict[str, Any]:
     """Fallback product detection when AI is unavailable"""
     query_lower = query.lower()
     
-    # Check for common product categories
+    # Check for common product categories with advanced attributes
     categories = {
         "laptop": {
             "products": ["Gaming Laptop 15.6\"", "Business Ultrabook 14\"", "Student Laptop 13\"", "Workstation 17\"", "2-in-1 Convertible"],
             "brands": ["Dell", "HP", "Lenovo", "ASUS", "Acer"],
+            "models": ["XPS 15", "ThinkPad X1", "ROG Zephyrus", "ZenBook Pro", "MacBook Air"],
+            "colors": ["Silver", "Black", "Space Gray", "White", "Blue"],
+            "sizes": ["13 inch", "14 inch", "15 inch", "16 inch", "17 inch"],
+            "specifications": {
+                "RAM": ["8GB", "16GB", "32GB", "64GB"],
+                "Storage": ["256GB SSD", "512GB SSD", "1TB SSD", "2TB SSD"],
+                "Processor": ["Intel i5", "Intel i7", "Intel i9", "AMD Ryzen 5", "AMD Ryzen 7", "Apple M3"]
+            },
+            "materials": ["Aluminum", "Carbon Fiber", "Magnesium Alloy", "Plastic"],
             "price_range": (25000, 150000),
             "descriptions": ["High performance processor", "SSD storage", "Full HD display", "Long battery life", "Lightweight design"]
         },
         "phone": {
-            "products": ["Pro Max 256GB", "Standard 128GB", "Lite 64GB", "Ultra 512GB", "Plus 256GB"],
+            "products": ["Pro Max", "Standard", "Lite", "Ultra", "Plus"],
             "brands": ["Apple", "Samsung", "OnePlus", "Xiaomi", "Google"],
+            "models": ["iPhone 15 Pro", "Galaxy S24", "Pixel 8", "OnePlus 12", "Mi 14"],
+            "colors": ["Black", "White", "Blue", "Purple", "Gold", "Silver", "Green"],
+            "sizes": ["64GB", "128GB", "256GB", "512GB", "1TB"],
+            "specifications": {
+                "RAM": ["6GB", "8GB", "12GB", "16GB"],
+                "Camera": ["12MP", "48MP", "50MP", "108MP", "200MP"],
+                "Display": ["6.1 inch", "6.5 inch", "6.7 inch", "6.8 inch"]
+            },
+            "materials": ["Glass", "Titanium", "Aluminum", "Ceramic"],
             "price_range": (10000, 150000),
             "descriptions": ["5G connectivity", "AMOLED display", "Fast charging", "AI camera system", "Premium build"]
+        },
+        "iphone": {
+            "products": ["iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 14"],
+            "brands": ["Apple"],
+            "models": ["iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max"],
+            "colors": ["Black", "White", "Blue", "Pink", "Yellow", "Natural Titanium", "Blue Titanium"],
+            "sizes": ["128GB", "256GB", "512GB", "1TB"],
+            "specifications": {
+                "Chip": ["A16 Bionic", "A17 Pro"],
+                "Camera": ["48MP Main", "48MP Ultra Wide", "12MP Telephoto"],
+                "Display": ["6.1 inch", "6.7 inch"]
+            },
+            "materials": ["Titanium", "Aluminum", "Ceramic Shield"],
+            "price_range": (70000, 180000),
+            "descriptions": ["A17 Pro chip", "ProMotion display", "Action button", "USB-C", "Ceramic Shield"]
         },
         "tv": {
             "products": ["55-inch 4K LED", "65-inch OLED", "43-inch Smart TV", "75-inch QLED", "50-inch Android TV"],
             "brands": ["Samsung", "LG", "Sony", "TCL", "Mi"],
+            "models": ["Neo QLED", "C3 OLED", "Bravia XR", "Fire TV", "Google TV"],
+            "colors": ["Black", "Silver", "White", "Titan Black"],
+            "sizes": ["32 inch", "43 inch", "50 inch", "55 inch", "65 inch", "75 inch", "85 inch"],
+            "specifications": {
+                "Resolution": ["Full HD", "4K UHD", "8K UHD"],
+                "Panel": ["LED", "OLED", "QLED", "Mini LED"],
+                "Refresh Rate": ["60Hz", "120Hz", "144Hz"]
+            },
+            "materials": ["Metal Stand", "Plastic Frame", "Slim Bezel"],
             "price_range": (20000, 300000),
             "descriptions": ["4K Ultra HD", "Smart TV features", "Dolby Vision", "HDR support", "Voice control"]
         },
         "headphone": {
             "products": ["Wireless ANC", "Gaming Headset", "Studio Monitor", "True Wireless Earbuds", "Sports Earphones"],
             "brands": ["Sony", "Bose", "JBL", "Sennheiser", "Apple"],
+            "models": ["WH-1000XM5", "AirPods Pro", "QuietComfort", "Momentum 4", "Free Buds"],
+            "colors": ["Black", "White", "Silver", "Blue", "Beige", "Midnight Blue"],
+            "sizes": ["One Size", "Small Tips", "Medium Tips", "Large Tips"],
+            "specifications": {
+                "Driver": ["30mm", "40mm", "50mm"],
+                "Battery": ["20 hours", "30 hours", "40 hours", "60 hours"],
+                "Connectivity": ["Bluetooth 5.0", "Bluetooth 5.2", "Bluetooth 5.3"]
+            },
+            "materials": ["Leather", "Memory Foam", "Silicone", "Plastic"],
             "price_range": (2000, 40000),
             "descriptions": ["Active noise cancellation", "Hi-Fi audio", "Long battery life", "Comfortable fit", "Premium sound"]
         },
         "shoe": {
             "products": ["Running Shoes", "Casual Sneakers", "Basketball Shoes", "Training Shoes", "Lifestyle Sneakers"],
             "brands": ["Nike", "Adidas", "Puma", "Reebok", "New Balance"],
+            "models": ["Air Max", "Ultraboost", "RS-X", "Classic Leather", "574"],
+            "colors": ["Black", "White", "Red", "Blue", "Gray", "Multi-color"],
+            "sizes": ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11", "UK 12"],
+            "specifications": {
+                "Type": ["Running", "Training", "Casual", "Basketball", "Walking"],
+                "Closure": ["Lace-up", "Slip-on", "Velcro"],
+                "Sole": ["Rubber", "EVA", "Boost", "Air Max", "React"]
+            },
+            "materials": ["Mesh", "Leather", "Synthetic", "Knit", "Canvas"],
             "price_range": (2000, 25000),
             "descriptions": ["Comfortable cushioning", "Breathable material", "Durable sole", "Stylish design", "Lightweight"]
+        },
+        "shirt": {
+            "products": ["Formal Shirt", "Casual Shirt", "T-Shirt", "Polo Shirt", "Oxford Shirt"],
+            "brands": ["Allen Solly", "Van Heusen", "Peter England", "Louis Philippe", "Arrow"],
+            "models": ["Slim Fit", "Regular Fit", "Relaxed Fit", "Classic Fit"],
+            "colors": ["White", "Blue", "Black", "Pink", "Gray", "Navy", "Striped"],
+            "sizes": ["S", "M", "L", "XL", "XXL", "XXXL"],
+            "specifications": {
+                "Fit": ["Slim Fit", "Regular Fit", "Relaxed Fit"],
+                "Sleeve": ["Full Sleeve", "Half Sleeve", "Sleeveless"],
+                "Collar": ["Spread Collar", "Button Down", "Mandarin", "Round Neck"]
+            },
+            "materials": ["Cotton", "Linen", "Polyester", "Cotton Blend", "Oxford"],
+            "price_range": (500, 5000),
+            "descriptions": ["Premium cotton", "Wrinkle-free", "Breathable fabric", "Easy care", "Classic style"]
         }
     }
     
@@ -296,6 +371,11 @@ def fallback_product_detection(query: str) -> Dict[str, Any]:
             "product_name": matched_category.title(),
             "products": cat_data["products"],
             "brands": cat_data["brands"],
+            "models": cat_data.get("models", []),
+            "colors": cat_data.get("colors", []),
+            "sizes": cat_data.get("sizes", []),
+            "specifications": cat_data.get("specifications", {}),
+            "materials": cat_data.get("materials", []),
             "price_range_min": cat_data["price_range"][0],
             "price_range_max": cat_data["price_range"][1],
             "unit": "per piece",
@@ -309,6 +389,11 @@ def fallback_product_detection(query: str) -> Dict[str, Any]:
         "product_name": query.title(),
         "products": [f"{query} Model A", f"{query} Model B", f"{query} Pro", f"{query} Standard", f"{query} Premium"],
         "brands": ["Brand A", "Brand B", "Brand C", "Brand D", "Brand E"],
+        "models": ["Standard", "Pro", "Plus", "Max", "Lite"],
+        "colors": ["Black", "White", "Silver", "Blue", "Red"],
+        "sizes": ["Small", "Medium", "Large", "XL"],
+        "specifications": {},
+        "materials": [],
         "price_range_min": 1000,
         "price_range_max": 50000,
         "unit": "per piece",
