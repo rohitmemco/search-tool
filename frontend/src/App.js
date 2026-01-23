@@ -1248,6 +1248,9 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
   };
 
   const convertedPrice = convertPrice(product.price);
+  
+  // Check if product has any advanced attributes to display
+  const hasAdvancedAttrs = product.model || product.color || product.size || product.material || (product.specifications && Object.keys(product.specifications).length > 0);
 
   if (view === "list") {
     return (
@@ -1269,6 +1272,21 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
             <StarRating rating={product.rating} />
             <AvailabilityBadge status={product.availability} />
           </div>
+          {/* Product attributes in list view */}
+          {hasAdvancedAttrs && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {product.color && (
+                <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-700">
+                  <span className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: product.color.toLowerCase() === 'white' ? '#e2e8f0' : product.color.toLowerCase() }} />
+                  {product.color}
+                </Badge>
+              )}
+              {product.size && <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-700">{product.size}</Badge>}
+              {product.specifications && Object.entries(product.specifications).slice(0, 2).map(([key, value]) => (
+                <Badge key={key} variant="outline" className="text-xs bg-slate-50 dark:bg-slate-700">{value}</Badge>
+              ))}
+            </div>
+          )}
         </div>
         <div className="text-right">
           <p className="text-xl font-bold text-blue-600">
@@ -1336,7 +1354,34 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
           <StarRating rating={product.rating} />
           <AvailabilityBadge status={product.availability} />
         </div>
-        <p className="product-card-description dark:text-slate-400">{product.description}</p>
+        
+        {/* Advanced Product Attributes */}
+        {hasAdvancedAttrs && (
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex flex-wrap gap-1.5">
+              {product.color && (
+                <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-700 gap-1" data-testid={`product-color-${index}`}>
+                  <span className="w-2.5 h-2.5 rounded-full border border-slate-300" style={{ backgroundColor: product.color.toLowerCase() === 'white' ? '#f8fafc' : product.color.toLowerCase() }} />
+                  {product.color}
+                </Badge>
+              )}
+              {product.size && <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" data-testid={`product-size-${index}`}>{product.size}</Badge>}
+              {product.material && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">{product.material}</Badge>}
+            </div>
+            {product.specifications && Object.keys(product.specifications).length > 0 && (
+              <div className="mt-2 space-y-1">
+                {Object.entries(product.specifications).slice(0, 3).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 dark:text-slate-400">{key}:</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        <p className="product-card-description dark:text-slate-400 mt-2">{product.description}</p>
         
         {product.vendor && (
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
