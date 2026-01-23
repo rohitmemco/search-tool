@@ -1143,8 +1143,21 @@ const VendorInfoModal = ({ vendor, productName }) => {
       case "Premium Vendor": return "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400";
       case "Trusted Supplier": return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
       case "Gold Member": return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400";
+      case "Platform Verified": return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
+      case "Local Verified": return "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400";
+      case "ISO Certified": return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400";
+      case "Trade Assured": return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400";
       default: return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300";
     }
+  };
+
+  const getVendorTypeIcon = (type) => {
+    if (type?.includes("Factory") || type?.includes("Manufacturer")) return "🏭";
+    if (type?.includes("Wholesale")) return "📦";
+    if (type?.includes("Local") || type?.includes("Retail")) return "🏪";
+    if (type?.includes("Online")) return "🌐";
+    if (type?.includes("Authorized")) return "✅";
+    return "🏢";
   };
   
   return (
@@ -1166,7 +1179,11 @@ const VendorInfoModal = ({ vendor, productName }) => {
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-semibold text-lg text-slate-800 dark:text-white">{vendor.vendor_name}</h3>
-              <p className="text-sm text-slate-500">{vendor.vendor_type}</p>
+              <p className="text-sm text-slate-500 flex items-center gap-1">
+                <span>{getVendorTypeIcon(vendor.vendor_type)}</span>
+                {vendor.vendor_type}
+                {vendor.business_type && <span className="text-slate-400">• {vendor.business_type}</span>}
+              </p>
             </div>
             <Badge variant="outline" className={getVerificationColor(vendor.verification_status)}>
               <BadgeCheck className="w-3 h-3 mr-1" />
@@ -1228,6 +1245,16 @@ const VendorInfoModal = ({ vendor, productName }) => {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{vendor.years_in_business} years</p>
             </div>
           </div>
+
+          {/* Min Order Quantity - show for wholesalers/factories */}
+          {vendor.min_order_quantity && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                <span>📦</span>
+                {vendor.min_order_quantity}
+              </p>
+            </div>
+          )}
           
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 pt-2 border-t dark:border-slate-700">
             <Clock className="w-4 h-4" />
