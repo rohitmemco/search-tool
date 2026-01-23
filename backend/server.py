@@ -1077,6 +1077,60 @@ async def search_products(request: SearchRequest):
         
         logger.info(f"Location: {location_data}, Currency: {currency_info}")
         
+        # Try to get REAL data from SerpAPI first
+        real_results = await search_with_serpapi(query, location_data["country"], request.max_results)
+        
+        if real_results and len(real_results) > 0:
+            # We have real data from Google Shopping!
+            logger.info(f"Using {len(real_results)} REAL results from SerpAPI")
+            
+            all_results = real_results
+            
+            # Generate analysis for real data
+            analysis = generate_real_data_analysis(all_results, query, location_data, currency_info)
+            
+            # Prepare data sources from real results
+            data_sources = []
+            seen_sources = set()
+            for result in all_results:
+                source_name = result.get("source", "Unknown")
+                if source_name not in seen_sources:
+                    seen_sources.add(source_name)
+                    data_sources.append({
+                        "name": source_name,
+                        "url": result.get("source_url", "").split("?")[0] if result.get("source_url") else "",
+                        "type": "Real Marketplace",
+                        "description": f"Live prices from {source_name}"
+                    })
+            
+            # Store search in database
+            search_doc = {
+                "id": str(uuid.uuid4()),
+                "query": query,
+                "results_count": len(all_results),
+                "data_source": "serpapi_real",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await db.searches.insert_one(search_doc)
+            
+            # For real data, we extract filters from actual results
+            available_filters = extract_filters_from_real_data(all_results)
+            
+            return SearchResponse(
+                success=True,
+                query=query,
+                message=None,
+                response=analysis,
+                results=all_results,
+                results_count=len(all_results),
+                ai_model="SerpAPI Google Shopping",
+                data_sources=data_sources,
+                available_filters=available_filters
+            )
+        
+        # Fallback to AI-generated mock data if SerpAPI fails or returns no results
+        logger.info("SerpAPI returned no results, falling back to mock data")
+        
         # Detect product using AI
         product_data = await detect_product_with_ai(query)
         
