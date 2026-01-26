@@ -127,9 +127,10 @@ Build a comprehensive web-based application that enables users to search for any
 - [x] Price comparison charts
 - [x] PDF export
 - [x] Vendor details (name, email, phone, address)
+- [x] Local store search using OpenStreetMap ✅ NEW
 
 ### P1 (High Priority)
-- [ ] Real marketplace API integrations (Amazon, eBay APIs)
+- [ ] Price Alerts - User accounts and notifications for price drops
 - [ ] User accounts and saved searches
 - [ ] Price alerts/notifications
 - [ ] Product comparison feature (side-by-side)
