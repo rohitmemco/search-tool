@@ -1145,26 +1145,26 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
         
         # Build Overpass API query - includes retail shops, factories, wholesale, manufacturing
-        # Simplified query to avoid timeout
-        overpass_query = f'''
-[out:json][timeout:25];
+        shop_regex = shop_categories['shop']
+        
+        overpass_query = f'''[out:json][timeout:25];
 area["name"="{osm_area}"]->.searchArea;
 (
-  node["shop"~"{shop_categories['shop']}|wholesale"](area.searchArea);
-  way["shop"~"{shop_categories['shop']}|wholesale"](area.searchArea);
+  node["shop"~"{shop_regex}"](area.searchArea);
+  way["shop"~"{shop_regex}"](area.searchArea);
+  node["shop"="wholesale"](area.searchArea);
   node["industrial"]["name"](area.searchArea);
-  way["industrial"]["name"](area.searchArea);
-  node["office"~"company"]["name"](area.searchArea);
-  node["craft"]["name"](area.searchArea);
+  node["office"]["name"](area.searchArea);
 );
-out body {max_results};
-'''
+out body {max_results};'''
+        
+        logger.info(f"Overpass query for area '{osm_area}' with shop regex: {shop_regex}")
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 "https://overpass-api.de/api/interpreter",
                 data=overpass_query,
-                timeout=35.0
+                timeout=40.0
             )
             
             if response.status_code != 200:
