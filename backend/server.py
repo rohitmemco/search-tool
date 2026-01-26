@@ -1391,7 +1391,6 @@ out body {max_results * 2};'''
                 
                 # Check if store name contains any product keyword (high relevance)
                 # Use word boundary matching to avoid false positives like "textiles" matching "tiles"
-                import re
                 is_relevant = False
                 for keyword in product_keywords:
                     # Check if keyword appears as a whole word in the name or shop type
