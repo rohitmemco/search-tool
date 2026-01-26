@@ -1777,10 +1777,14 @@ const VendorsSection = ({ results }) => {
               </div>
             </div>
             
-            {vendor.vendor_website && (
-              <div className="space-y-2 text-sm mb-4">
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <Globe className="w-4 h-4 text-blue-500" />
+            {/* Vendor Details Section */}
+            <div className="space-y-2 text-sm mb-4 border-t border-slate-100 dark:border-slate-700 pt-3">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Vendor Details</p>
+              
+              {/* Website */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Globe className="w-4 h-4 text-blue-500" />
+                {vendor.vendor_website ? (
                   <a 
                     href={vendor.vendor_website} 
                     target="_blank" 
@@ -1789,11 +1793,65 @@ const VendorsSection = ({ results }) => {
                   >
                     Visit Website
                   </a>
-                </div>
+                ) : (
+                  <span className="text-slate-400 italic">Website not available</span>
+                )}
               </div>
-            )}
+              
+              {/* Email */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Mail className="w-4 h-4 text-purple-500" />
+                {vendor.vendor_email ? (
+                  <a href={`mailto:${vendor.vendor_email}`} className="hover:text-purple-600 hover:underline truncate">
+                    {vendor.vendor_email}
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">Email not available</span>
+                )}
+              </div>
+              
+              {/* Phone */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Phone className="w-4 h-4 text-green-500" />
+                {vendor.vendor_phone ? (
+                  <a href={`tel:${vendor.vendor_phone}`} className="hover:text-green-600 hover:underline">
+                    {vendor.vendor_phone}
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">Phone not available</span>
+                )}
+              </div>
+              
+              {/* Address */}
+              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
+                <MapPin className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                {vendor.vendor_address ? (
+                  <span className="text-xs line-clamp-2">{vendor.vendor_address}</span>
+                ) : (
+                  <span className="text-slate-400 italic text-xs">Address not available</span>
+                )}
+              </div>
+              
+              {/* Business Info */}
+              {(vendor.years_in_business || vendor.response_time || vendor.verification_status) && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {vendor.years_in_business && (
+                    <Badge variant="outline" className="text-xs">
+                      <Building2 className="w-3 h-3 mr-1" />
+                      {vendor.years_in_business} years
+                    </Badge>
+                  )}
+                  {vendor.response_time && (
+                    <Badge variant="outline" className="text-xs">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {vendor.response_time}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
             
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-700">
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
                 <Package className="w-3 h-3 inline mr-1" />
                 {vendor.products.length} product{vendor.products.length > 1 ? 's' : ''} available
