@@ -711,6 +711,7 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
     """
     Generate vendor details based on the real source/seller name from SerpAPI.
     Classifies vendors as: Online Marketplace, Factory/Manufacturer, Wholesaler, Local Shop, etc.
+    Uses the search location to generate relevant addresses.
     """
     source_lower = source_name.lower()
     
@@ -758,36 +759,81 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
             vendor_type = "Online Seller"
             business_type = "Verified Seller"
     
-    # Get location-specific cities for address
+    # Get location from search query - use city if available
+    search_city = location_data.get("city", "").lower()
     country = location_data.get("country", "india").lower()
-    city_databases = {
-        "india": [
-            {"name": "Mumbai", "state": "Maharashtra", "streets": ["Andheri West", "Bandra East", "Dadar", "Powai", "Malad West"]},
-            {"name": "Delhi", "state": "Delhi NCR", "streets": ["Nehru Place", "Karol Bagh", "Lajpat Nagar", "Connaught Place", "Chandni Chowk"]},
-            {"name": "Bangalore", "state": "Karnataka", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road"]},
-            {"name": "Chennai", "state": "Tamil Nadu", "streets": ["T Nagar", "Anna Nagar", "Adyar", "Mylapore", "Velachery"]},
-            {"name": "Hyderabad", "state": "Telangana", "streets": ["Ameerpet", "Kukatpally", "Hitech City", "Secunderabad", "Banjara Hills"]},
-            {"name": "Kolkata", "state": "West Bengal", "streets": ["Park Street", "Salt Lake", "Howrah", "Esplanade", "New Market"]},
-            {"name": "Pune", "state": "Maharashtra", "streets": ["Hinjewadi", "Kothrud", "Viman Nagar", "Wakad", "FC Road"]},
-        ],
-        "usa": [
-            {"name": "New York", "state": "NY", "streets": ["5th Avenue", "Broadway", "Wall Street", "Madison Avenue", "Times Square"]},
-            {"name": "Los Angeles", "state": "CA", "streets": ["Hollywood Blvd", "Rodeo Drive", "Venice Beach", "Santa Monica", "Downtown LA"]},
-            {"name": "Chicago", "state": "IL", "streets": ["Michigan Avenue", "State Street", "Wacker Drive", "Oak Street", "Lincoln Park"]},
-        ],
-        "uk": [
-            {"name": "London", "state": "England", "streets": ["Oxford Street", "Regent Street", "Bond Street", "Tottenham Court Road", "Piccadilly"]},
-            {"name": "Manchester", "state": "England", "streets": ["Market Street", "Deansgate", "Piccadilly", "King Street", "Northern Quarter"]},
-        ]
+    
+    # City-specific street data
+    city_street_data = {
+        # India
+        "mumbai": {"name": "Mumbai", "state": "Maharashtra", "country": "india", "streets": ["Andheri West", "Bandra East", "Dadar", "Powai", "Malad West", "Worli", "Lower Parel"]},
+        "delhi": {"name": "Delhi", "state": "Delhi NCR", "country": "india", "streets": ["Nehru Place", "Karol Bagh", "Lajpat Nagar", "Connaught Place", "Chandni Chowk", "Saket", "Dwarka"]},
+        "bangalore": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
+        "bengaluru": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
+        "banglore": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
+        "chennai": {"name": "Chennai", "state": "Tamil Nadu", "country": "india", "streets": ["T Nagar", "Anna Nagar", "Adyar", "Mylapore", "Velachery", "Nungambakkam", "Guindy"]},
+        "hyderabad": {"name": "Hyderabad", "state": "Telangana", "country": "india", "streets": ["Ameerpet", "Kukatpally", "Hitech City", "Secunderabad", "Banjara Hills", "Gachibowli", "Madhapur"]},
+        "kolkata": {"name": "Kolkata", "state": "West Bengal", "country": "india", "streets": ["Park Street", "Salt Lake", "Howrah", "Esplanade", "New Market", "Ballygunge", "Gariahat"]},
+        "pune": {"name": "Pune", "state": "Maharashtra", "country": "india", "streets": ["Hinjewadi", "Kothrud", "Viman Nagar", "Wakad", "FC Road", "Shivaji Nagar", "Deccan"]},
+        "ahmedabad": {"name": "Ahmedabad", "state": "Gujarat", "country": "india", "streets": ["CG Road", "SG Highway", "Satellite", "Navrangpura", "Vastrapur", "Bodakdev", "Prahlad Nagar"]},
+        "jaipur": {"name": "Jaipur", "state": "Rajasthan", "country": "india", "streets": ["MI Road", "Vaishali Nagar", "Malviya Nagar", "Raja Park", "C Scheme", "Mansarovar", "Tonk Road"]},
+        "lucknow": {"name": "Lucknow", "state": "Uttar Pradesh", "country": "india", "streets": ["Hazratganj", "Gomti Nagar", "Aminabad", "Alambagh", "Chowk", "Indira Nagar", "Aliganj"]},
+        "india": {"name": "Mumbai", "state": "Maharashtra", "country": "india", "streets": ["Andheri West", "Bandra East", "Dadar", "Powai", "Malad West"]},
+        # USA
+        "new york": {"name": "New York", "state": "NY", "country": "usa", "streets": ["5th Avenue", "Broadway", "Wall Street", "Madison Avenue", "Times Square", "Park Avenue"]},
+        "los angeles": {"name": "Los Angeles", "state": "CA", "country": "usa", "streets": ["Hollywood Blvd", "Rodeo Drive", "Venice Beach", "Santa Monica Blvd", "Sunset Blvd", "Wilshire Blvd"]},
+        "chicago": {"name": "Chicago", "state": "IL", "country": "usa", "streets": ["Michigan Avenue", "State Street", "Wacker Drive", "Oak Street", "Lincoln Park", "Navy Pier"]},
+        "san francisco": {"name": "San Francisco", "state": "CA", "country": "usa", "streets": ["Market Street", "Union Square", "Fisherman's Wharf", "Mission District", "SOMA", "Embarcadero"]},
+        "usa": {"name": "New York", "state": "NY", "country": "usa", "streets": ["5th Avenue", "Broadway", "Wall Street", "Madison Avenue", "Times Square"]},
+        # UK
+        "london": {"name": "London", "state": "England", "country": "uk", "streets": ["Oxford Street", "Regent Street", "Bond Street", "Tottenham Court Road", "Piccadilly", "Kensington High Street"]},
+        "manchester": {"name": "Manchester", "state": "England", "country": "uk", "streets": ["Market Street", "Deansgate", "Piccadilly", "King Street", "Northern Quarter", "Spinningfields"]},
+        "uk": {"name": "London", "state": "England", "country": "uk", "streets": ["Oxford Street", "Regent Street", "Bond Street", "Tottenham Court Road", "Piccadilly"]},
+        # UAE
+        "dubai": {"name": "Dubai", "state": "Dubai", "country": "uae", "streets": ["Sheikh Zayed Road", "Deira", "Bur Dubai", "Jumeirah", "Business Bay", "Downtown Dubai", "Al Barsha"]},
+        "abu dhabi": {"name": "Abu Dhabi", "state": "Abu Dhabi", "country": "uae", "streets": ["Corniche Road", "Hamdan Street", "Al Maryah Island", "Khalifa City", "Tourist Club Area", "Al Reem Island"]},
+        "uae": {"name": "Dubai", "state": "Dubai", "country": "uae", "streets": ["Sheikh Zayed Road", "Deira", "Bur Dubai", "Jumeirah", "Business Bay", "Downtown Dubai"]},
+        # Other countries
+        "tokyo": {"name": "Tokyo", "state": "Tokyo", "country": "japan", "streets": ["Shibuya", "Shinjuku", "Ginza", "Akihabara", "Harajuku", "Roppongi"]},
+        "japan": {"name": "Tokyo", "state": "Tokyo", "country": "japan", "streets": ["Shibuya", "Shinjuku", "Ginza", "Akihabara", "Harajuku", "Roppongi"]},
+        "sydney": {"name": "Sydney", "state": "NSW", "country": "australia", "streets": ["George Street", "Pitt Street", "Oxford Street", "Crown Street", "King Street", "Darling Harbour"]},
+        "australia": {"name": "Sydney", "state": "NSW", "country": "australia", "streets": ["George Street", "Pitt Street", "Oxford Street", "Crown Street", "King Street"]},
+        "toronto": {"name": "Toronto", "state": "Ontario", "country": "canada", "streets": ["Yonge Street", "Queen Street", "King Street", "Bloor Street", "Dundas Street", "Bay Street"]},
+        "canada": {"name": "Toronto", "state": "Ontario", "country": "canada", "streets": ["Yonge Street", "Queen Street", "King Street", "Bloor Street", "Dundas Street"]},
+        "paris": {"name": "Paris", "state": "Île-de-France", "country": "europe", "streets": ["Champs-Élysées", "Rue de Rivoli", "Boulevard Haussmann", "Rue du Faubourg Saint-Honoré", "Avenue Montaigne"]},
+        "berlin": {"name": "Berlin", "state": "Berlin", "country": "europe", "streets": ["Kurfürstendamm", "Friedrichstraße", "Unter den Linden", "Alexanderplatz", "Potsdamer Platz"]},
+        "europe": {"name": "Paris", "state": "Île-de-France", "country": "europe", "streets": ["Champs-Élysées", "Rue de Rivoli", "Boulevard Haussmann"]},
     }
     
-    cities = city_databases.get(country, city_databases["india"])
-    city_info = random.choice(cities)
+    # Find the city info - first try exact city match, then country default
+    city_info = None
+    if search_city and search_city in city_street_data:
+        city_info = city_street_data[search_city]
+    elif country in city_street_data:
+        city_info = city_street_data[country]
+    else:
+        # Default to India/Mumbai
+        city_info = city_street_data["india"]
+    
+    # Use the found city info
+    actual_country = city_info.get("country", country)
     street = random.choice(city_info["streets"])
     
-    # Generate realistic contact details based on vendor type
+    # Generate realistic contact details based on vendor type and country
+    country_phone_prefixes = {
+        "india": "+91",
+        "usa": "+1",
+        "uk": "+44",
+        "uae": "+971",
+        "japan": "+81",
+        "australia": "+61",
+        "canada": "+1",
+        "europe": "+33"
+    }
+    
+    phone_prefix = country_phone_prefixes.get(actual_country, "+91")
+    
     if vendor_type == "Factory / Manufacturer":
-        phone_prefix = "+91 " if country == "india" else "+1 "
         email_domain = source_name.lower().replace(" ", "").replace(".", "")[:15] + ".com"
         years_in_business = random.randint(10, 35)
         response_time = "Within 24 hours"
@@ -795,7 +841,6 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         business_hours = "Mon-Sat: 9:00 AM - 6:00 PM"
         min_order = f"MOQ: {random.choice([10, 25, 50, 100])} units"
     elif vendor_type == "Wholesale Supplier":
-        phone_prefix = "+91 " if country == "india" else "+1 "
         email_domain = "sales." + source_name.lower().replace(" ", "")[:10] + ".com"
         years_in_business = random.randint(5, 20)
         response_time = "Within 4 hours"
@@ -803,7 +848,6 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         business_hours = "Mon-Sat: 8:00 AM - 8:00 PM"
         min_order = f"MOQ: {random.choice([5, 10, 25])} units"
     elif vendor_type == "Local Retail Shop":
-        phone_prefix = "+91 " if country == "india" else "+1 "
         email_domain = source_name.lower().replace(" ", "")[:12] + "@gmail.com"
         years_in_business = random.randint(3, 15)
         response_time = "Immediate"
@@ -811,7 +855,6 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         business_hours = "Mon-Sun: 10:00 AM - 9:00 PM"
         min_order = "No minimum order"
     else:
-        phone_prefix = "1800-" if country == "india" else "1-800-"
         email_domain = "support@" + source_name.lower().replace(" ", "").replace(".", "")[:10] + ".com"
         years_in_business = random.randint(5, 25)
         response_time = "Within 2 hours"
@@ -819,15 +862,37 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         business_hours = "24/7 Customer Support"
         min_order = "No minimum order"
     
-    # Generate phone number
-    if country == "india":
+    # Generate phone number based on country
+    if actual_country == "india":
         phone = f"+91 {random.randint(70, 99)}{random.randint(10000000, 99999999)}"
-    else:
+    elif actual_country == "usa" or actual_country == "canada":
         phone = f"+1 {random.randint(200, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
+    elif actual_country == "uk":
+        phone = f"+44 {random.randint(20, 79)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
+    elif actual_country == "uae":
+        phone = f"+971 {random.choice([4, 50, 52, 55, 56])}{random.randint(1000000, 9999999)}"
+    elif actual_country == "japan":
+        phone = f"+81 {random.randint(3, 90)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
+    elif actual_country == "australia":
+        phone = f"+61 {random.randint(2, 8)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
+    else:
+        phone = f"+33 {random.randint(1, 9)} {random.randint(10, 99)} {random.randint(10, 99)} {random.randint(10, 99)} {random.randint(10, 99)}"
+    
+    # Generate postal code based on country
+    if actual_country == "india":
+        postal_code = random.randint(100000, 999999)
+    elif actual_country == "usa":
+        postal_code = random.randint(10000, 99999)
+    elif actual_country == "uk":
+        postal_code = f"{random.choice(['E', 'W', 'N', 'S', 'SE', 'SW', 'NW', 'EC', 'WC'])}{random.randint(1, 20)} {random.randint(1, 9)}{random.choice(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L'])}{random.choice(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L'])}"
+    elif actual_country == "uae":
+        postal_code = random.randint(10000, 99999)
+    else:
+        postal_code = random.randint(10000, 99999)
     
     # Generate address
     building_num = random.randint(1, 500)
-    postal_code = random.randint(100000, 999999) if country == "india" else random.randint(10000, 99999)
+    full_address = f"#{building_num}, {street}, {city_info['name']}, {city_info['state']} - {postal_code}"
     full_address = f"#{building_num}, {street}, {city_info['name']}, {city_info['state']} - {postal_code}"
     
     return {
