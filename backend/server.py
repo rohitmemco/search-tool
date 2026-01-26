@@ -912,10 +912,11 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
     }
 
 # ================== REAL SERPAPI SEARCH ==================
-async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30) -> List[Dict]:
+async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
     """
     Search Google Shopping using SerpAPI for real product data.
     Returns actual prices and working product links from real marketplaces.
+    Uses city parameter to generate location-accurate vendor details.
     """
     if not SERPAPI_API_KEY:
         logger.warning("SerpAPI key not configured, falling back to mock data")
@@ -946,7 +947,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
             "num": min(max_results, 100)
         }
         
-        logger.info(f"SerpAPI search: query='{query}', country={params['gl']}")
+        logger.info(f"SerpAPI search: query='{query}', country={params['gl']}, city={city}")
         
         # Run SerpAPI search in thread pool to avoid blocking
         loop = asyncio.get_event_loop()
@@ -956,11 +957,13 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
         products = []
         currency_symbol = "₹" if params["currency"] == "INR" else "$" if params["currency"] == "USD" else params["currency"]
         
-        # Location data for vendor generation
+        # Location data for vendor generation - use city from search query if available
         location_data = {
-            "city": params["location"].split(",")[0] if "," in params["location"] else params["location"],
+            "city": city.lower() if city else params["country"],
             "country": params["country"]
         }
+        
+        logger.info(f"Vendor location data: {location_data}")
         
         # Parse inline shopping results (featured products at top)
         if "inline_shopping_results" in api_response:
