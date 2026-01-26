@@ -111,10 +111,12 @@ Build a comprehensive web-based application that enables users to search for any
 
 ## Tabs in Results View
 1. **Products** - Product cards with vendor info & modal
-2. **Vendors** - Vendor Directory with full contact details
-3. **Charts** - Price comparison & source distribution
-4. **Insights** - AI-generated market analysis
-5. **Sources** - Data sources with external links
+2. **Local Stores** - Physical stores nearby from OpenStreetMap ✅ NEW
+3. **Vendors** - Vendor Directory with full contact details
+4. **Charts** - Price comparison & source distribution
+5. **Distribution** - Price distribution chart
+6. **Insights** - AI-generated market analysis
+7. **Sources** - Data sources with external links
 
 ## Prioritized Backlog
 
