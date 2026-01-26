@@ -1205,32 +1205,6 @@ const VendorInfoModal = ({ vendor, productName }) => {
     </Dialog>
   );
 };
-            <div className="text-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-              <Building2 className="w-4 h-4 mx-auto text-slate-400 mb-1" />
-              <p className="text-xs text-slate-500 dark:text-slate-400">In Business</p>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{vendor.years_in_business} years</p>
-            </div>
-          </div>
-
-          {/* Min Order Quantity - show for wholesalers/factories */}
-          {vendor.min_order_quantity && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                <span>📦</span>
-                {vendor.min_order_quantity}
-              </p>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 pt-2 border-t dark:border-slate-700">
-            <Clock className="w-4 h-4" />
-            <span>{vendor.business_hours}</span>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 // Product Card Component
 const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFavoriteToggle, isFavorite, onCompareToggle, isInCompare }) => {
