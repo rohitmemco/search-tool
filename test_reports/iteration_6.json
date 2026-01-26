@@ -1,0 +1,90 @@
+{
+  "summary": "Backend testing completed for Local Store Search - Keyword Extraction and Relevance Filtering. All 14 tests passed. The P0 bug fix is working correctly: city names are properly excluded from product keywords, and word boundary regex prevents false positives like 'textiles' matching 'tiles'.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/search - local stores",
+        "issue": "Some cities (like New York) may return 0 local stores due to Overpass API timeouts or limited OSM data coverage",
+        "priority": "LOW"
+      },
+      {
+        "endpoint": "/api/search - local stores",
+        "issue": "For 'tap in hyderabad', hardware stores are returned but none marked as 'relevant' because none have 'tap' in their name - this is expected behavior but may seem like no relevant results",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "test_mirror_in_bangalore_excludes_bangalore_from_keywords - PASSED: Keywords=['mirror'], city name excluded",
+    "test_tap_in_hyderabad_excludes_hyderabad_from_keywords - PASSED: Keywords=['tap'], city name excluded",
+    "test_tiles_in_london_excludes_london_from_keywords - PASSED: Keywords=['tiles'], city name excluded, 9 relevant tile shops found",
+    "test_laptop_in_new_york_excludes_new_york_from_keywords - PASSED: Keywords=['laptop'], multi-word city name excluded",
+    "test_tiles_does_not_match_textiles - PASSED: Word boundary regex prevents 'tiles' from matching 'textiles'",
+    "test_word_boundary_regex_pattern - PASSED: Regex pattern \\btiles\\b correctly matches/excludes",
+    "test_local_stores_response_structure - PASSED: Response has name, address, is_relevant, categories, business_type, city",
+    "test_relevant_stores_appear_first - PASSED: Stores with is_relevant=true appear before non-relevant stores",
+    "test_local_stores_city_field - PASSED: local_stores_city correctly set to 'Bengaluru'",
+    "test_san_francisco_city_excluded - PASSED: Multi-word city 'san francisco' properly excluded",
+    "test_abu_dhabi_city_excluded - PASSED: Multi-word city 'abu dhabi' properly excluded",
+    "test_search_endpoint_returns_200 - PASSED",
+    "test_search_with_city_returns_local_stores - PASSED",
+    "test_search_without_city_may_skip_local_stores - PASSED"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_local_store_search.py",
+    "/app/test_reports/pytest/pytest_local_store_search.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "The keyword extraction logic in get_osm_categories_extended() is well-implemented with proper city detection and exclusion",
+    "Word boundary regex (\\b) in relevance checking prevents false positives like 'textiles' matching 'tiles'",
+    "Multi-word city names (new york, san francisco, abu dhabi) are properly handled by splitting and excluding each word"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_local_store_search.py"
+  ],
+
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "N/A - backend only testing"
+  },
+
+  "seed_data_creation": "None - using real OpenStreetMap Overpass API and SerpAPI",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Local store search keyword extraction bug is fixed. Tests verify: 1) City names excluded from product keywords, 2) Word boundary regex prevents false matches, 3) Relevant stores appear first in results. The Overpass API may timeout for some cities (like New York) - this is an external API limitation, not a code bug.",
+
+  "verified_bug_fixes": {
+    "P0_bug": "Keyword extraction incorrectly including city names",
+    "fix_verified": true,
+    "fix_details": "get_osm_categories_extended() now: 1) Detects city from query first using get_city_from_query(), 2) Builds exclusion list with city name and variations, 3) Filters out city words from product keywords",
+    "test_evidence": [
+      "'mirror in bangalore' -> keywords=['mirror'], NOT ['mirror', 'bangalore']",
+      "'tiles in london' -> keywords=['tiles'], NOT ['tiles', 'london']",
+      "'laptop in new york' -> keywords=['laptop'], NOT ['laptop', 'new', 'york']"
+    ]
+  },
+
+  "verified_word_boundary_fix": {
+    "issue": "'tiles' was matching 'textiles' stores",
+    "fix_verified": true,
+    "fix_details": "Relevance check uses word boundary regex: r'\\b' + re.escape(keyword) + r'\\b'",
+    "test_evidence": "No textile shops marked as relevant for 'tiles' search in London"
+  }
+}
