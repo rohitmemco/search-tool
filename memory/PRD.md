@@ -34,15 +34,23 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **OpenStreetMap Overpass API Integration** - FREE, no API key required!
 - ✅ **Real Local Stores**: Fetches actual physical stores from crowdsourced OSM data
 - ✅ **Location-Based Search**: Works with 30+ cities globally (Bangalore, Mumbai, Delhi, New York, London, Dubai, etc.)
-- ✅ **Store Details**: Name, address, phone, website, distance from city center, opening hours
+- ✅ **Store Details**: Name, address, phone, email, website, distance from city center, opening hours
 - ✅ **Category Mapping**: Auto-detects store type (electronics, mobile_phone, computer, clothes, shoes, etc.)
 - ✅ **Google Maps Links**: One-click "View on Google Maps" for each store
 - ✅ **New "Local Stores" Tab**: Dedicated UI section showing nearby physical stores
 - ✅ **Real Data Badge**: Shows "Real Data from OpenStreetMap" indicator
 - ✅ **"Call to Check Availability" Button**: Quick-dial button for stores with phone numbers
 - ✅ **"Details Not Available" Placeholders**: Shows friendly message when store info is missing
+- ✅ **Business Type Classification**: Shows different business types with icons:
+  - 🏪 Retail Shop (green badge)
+  - 🏭 Factory / Manufacturing Unit (purple badge)  
+  - 📦 Wholesale Supplier (orange badge)
+  - 🏢 Corporate Office / Showroom (blue badge)
+  - 🏬 Factory Outlet (pink badge)
+  - 🔧 Manufacturing Workshop (indigo badge)
 - ✅ **Vendor Details Enhancement**: Complete vendor info section with email, phone, address, website
 - ✅ **Missing Info Handling**: All missing vendor/store details show "not available" instead of being hidden
+- ✅ **Direct Vendor Links**: Product links now go directly to vendor websites (Amazon.in, Flipkart, Croma, etc.) instead of Google Shopping pages
 
 ### Jan 23, 2026 - REAL API Integration (SerpAPI) ✅
 - ✅ **SerpAPI Google Shopping Integration** - Fetches REAL prices from actual marketplaces
