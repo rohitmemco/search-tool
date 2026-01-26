@@ -163,6 +163,15 @@ const useCompare = () => {
 
 // Star rating component
 const StarRating = ({ rating }) => {
+  // Handle null/undefined ratings
+  if (rating === null || rating === undefined) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-sm text-slate-400 dark:text-slate-500">No rating</span>
+      </div>
+    );
+  }
+  
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
   
