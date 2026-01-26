@@ -1251,12 +1251,12 @@ def generate_real_data_analysis(results: List[Dict], query: str, location_data: 
     max_price = max(prices)
     avg_price = sum(prices) / len(prices)
     
-    # Find products with ratings
-    rated_products = [r for r in results if r.get("rating", 0) > 0]
-    best_rated = max(rated_products, key=lambda x: x.get("rating", 0)) if rated_products else None
+    # Find products with ratings (handle None ratings)
+    rated_products = [r for r in results if (r.get("rating") or 0) > 0]
+    best_rated = max(rated_products, key=lambda x: x.get("rating") or 0) if rated_products else None
     
     # Find cheapest product
-    cheapest = min(results, key=lambda x: x.get("price", float('inf'))) if results else None
+    cheapest = min(results, key=lambda x: x.get("price") or float('inf')) if results else None
     
     # Get unique sources
     sources = list(set([r.get("source", "Unknown") for r in results]))
