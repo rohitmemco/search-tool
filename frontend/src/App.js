@@ -8,7 +8,7 @@ import {
   Loader2, ShoppingCart, Package, Store, Mail, Phone, MapPin, Clock, Building2, 
   BadgeCheck, User, Users, Moon, Sun, Heart, History, Filter, ArrowUpDown, 
   Grid3X3, List, Share2, Copy, Mic, MicOff, X, Check, Sparkles, Zap, 
-  ChevronDown, SlidersHorizontal, FileSpreadsheet, GitCompare, Award, Flame
+  ChevronDown, SlidersHorizontal, FileSpreadsheet, GitCompare, Award, Flame, AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
