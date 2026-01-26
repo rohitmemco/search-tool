@@ -1530,24 +1530,50 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     """
     query_lower = query.lower()
     
-    # Remove common words AND city names to get product keywords
-    stop_words = ['price', 'in', 'at', 'the', 'a', 'an', 'for', 'of', 'to', 'and', 'or', 'best', 'cheap', 'buy', 'shop', 'store', 'near', 'me', 'online', 'cost', 'rate', 'rates']
+    # Step 1: Detect the city from the query FIRST
+    detected_city_info = get_city_from_query(query)
+    detected_city_name = detected_city_info.get("name", "").lower() if detected_city_info else ""
     
-    # Get all city names to exclude
-    city_names = list(CITY_COORDINATES.keys())
+    # Step 2: Build comprehensive list of location words to exclude
+    # Include the detected city name and all its variations
+    location_words_to_exclude = set()
+    if detected_city_name:
+        location_words_to_exclude.add(detected_city_name)
+        # Add individual words from multi-word city names (e.g., "new york" -> "new", "york")
+        for word in detected_city_name.split():
+            location_words_to_exclude.add(word)
     
+    # Add all city key variations that might match the detected city
+    for city_key, city_data in CITY_COORDINATES.items():
+        city_osm_name = city_data.get("name", "").lower()
+        if detected_city_name and (detected_city_name in city_osm_name or city_osm_name in detected_city_name):
+            location_words_to_exclude.add(city_key)
+            for word in city_key.split():
+                location_words_to_exclude.add(word)
+    
+    # Step 3: Define comprehensive stop words
+    stop_words = {
+        'price', 'prices', 'in', 'at', 'the', 'a', 'an', 'for', 'of', 'to', 'and', 'or', 
+        'best', 'cheap', 'buy', 'shop', 'store', 'stores', 'near', 'me', 'my', 'online', 
+        'cost', 'rate', 'rates', 'where', 'find', 'get', 'local', 'nearby', 'around',
+        'market', 'markets', 'dealer', 'dealers', 'seller', 'sellers', 'vendor', 'vendors',
+        'showroom', 'showrooms', 'outlet', 'outlets', 'wholesale', 'retail'
+    }
+    
+    # Step 4: Extract product keywords by filtering out stop words and location words
     words = query_lower.split()
     product_keywords = []
     for w in words:
+        # Skip stop words and very short words
         if w in stop_words or len(w) <= 2:
             continue
-        # Skip if it's a city name
-        is_city = False
-        for city in city_names:
-            if w in city or city in w:
-                is_city = True
-                break
-        if not is_city:
+        # Skip if it's a location word
+        if w in location_words_to_exclude:
+            continue
+        # Skip if word matches any city name exactly
+        if w in CITY_COORDINATES:
+            continue
+        # Add as product keyword
             product_keywords.append(w)
     
     # Build dynamic search terms
