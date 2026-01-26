@@ -1546,8 +1546,9 @@ out body {max_results * 2};'''
 
 def get_osm_categories_extended(query: str) -> Dict[str, str]:
     """
-    DYNAMIC category detection - extracts keywords from query to find relevant stores.
-    Works like online search - uses the actual product terms to find matching stores.
+    FULLY DYNAMIC - extracts product/brand keywords from query.
+    NO default shop categories - searches ONLY by product name in store names.
+    Works exactly like online search - finds stores with actual product/brand names.
     """
     query_lower = query.lower()
     
@@ -1556,15 +1557,13 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     detected_city_name = detected_city_info.get("name", "").lower() if detected_city_info else ""
     
     # Step 2: Build comprehensive list of location words to exclude
-    # Include the detected city name and all its variations
     location_words_to_exclude = set()
     if detected_city_name:
         location_words_to_exclude.add(detected_city_name)
-        # Add individual words from multi-word city names (e.g., "new york" -> "new", "york")
         for word in detected_city_name.split():
             location_words_to_exclude.add(word)
     
-    # Add all city key variations that might match the detected city
+    # Add all city key variations
     for city_key, city_data in CITY_COORDINATES.items():
         city_osm_name = city_data.get("name", "").lower()
         if detected_city_name and (detected_city_name in city_osm_name or city_osm_name in detected_city_name):
@@ -1572,7 +1571,7 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
             for word in city_key.split():
                 location_words_to_exclude.add(word)
     
-    # Step 3: Define comprehensive stop words
+    # Step 3: Define comprehensive stop words - DO NOT search for these
     stop_words = {
         'price', 'prices', 'in', 'at', 'the', 'a', 'an', 'for', 'of', 'to', 'and', 'or', 
         'best', 'cheap', 'buy', 'shop', 'store', 'stores', 'near', 'me', 'my', 'online', 
@@ -1581,142 +1580,20 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
         'showroom', 'showrooms', 'outlet', 'outlets', 'wholesale', 'retail'
     }
     
-    # Step 4: Extract product keywords by filtering out stop words and location words
+    # Step 4: Extract product/brand keywords
     words = query_lower.split()
     product_keywords = []
     for w in words:
-        # Skip stop words and very short words
         if w in stop_words or len(w) <= 2:
             continue
-        # Skip if it's a location word
         if w in location_words_to_exclude:
             continue
-        # Skip if word matches any city name exactly
         if w in CITY_COORDINATES:
             continue
-        # Add as product keyword
         product_keywords.append(w)
     
-    # Build dynamic search terms
-    search_terms = []
-    
-    for keyword in product_keywords:
-        # Add related shop types based on keyword
-        keyword_to_shop = {
-            # Electronics & Appliances
-            "phone": "mobile_phone|electronics",
-            "mobile": "mobile_phone|electronics", 
-            "iphone": "mobile_phone|electronics",
-            "samsung": "mobile_phone|electronics",
-            "laptop": "computer|electronics",
-            "computer": "computer|electronics",
-            "tv": "electronics",
-            "television": "electronics",
-            "camera": "electronics|photo",
-            "electronics": "electronics",
-            "fan": "electronics|electrical|houseware",
-            "fans": "electronics|electrical|houseware",
-            "crompton": "electronics|electrical|houseware",
-            "ceiling": "electronics|electrical|lighting",
-            "light": "electronics|electrical|lighting",
-            "lights": "electronics|electrical|lighting",
-            "lamp": "electronics|electrical|lighting",
-            "lamps": "electronics|electrical|lighting",
-            "bulb": "electronics|electrical|lighting",
-            "led": "electronics|electrical|lighting",
-            "ac": "electronics|electrical|houseware",
-            "airconditioner": "electronics|electrical|houseware",
-            "refrigerator": "electronics|electrical|houseware",
-            "fridge": "electronics|electrical|houseware",
-            "washing": "electronics|electrical|houseware",
-            "microwave": "electronics|electrical|houseware",
-            "oven": "electronics|electrical|houseware",
-            "mixer": "electronics|electrical|houseware",
-            "grinder": "electronics|electrical|houseware",
-            "cooler": "electronics|electrical|houseware",
-            "heater": "electronics|electrical|houseware",
-            "geyser": "electronics|electrical|houseware",
-            "appliance": "electronics|electrical|houseware",
-            "appliances": "electronics|electrical|houseware",
-            
-            # Home & Construction
-            "tap": "bathroom_furnishing|plumber|hardware",
-            "faucet": "bathroom_furnishing|plumber",
-            "tile": "tiles|bathroom_furnishing|flooring",
-            "tiles": "tiles|bathroom_furnishing|flooring",
-            "mirror": "glaziery|glass|interior_decoration",
-            "mirrors": "glaziery|glass|interior_decoration",
-            "glass": "glaziery|glass",
-            "window": "glaziery|glass|doityourself|hardware",
-            "windows": "glaziery|glass|doityourself|hardware",
-            "sliding": "glaziery|glass|doityourself|hardware",
-            "door": "doityourself|hardware|furniture",
-            "doors": "doityourself|hardware|furniture",
-            "paint": "paint|doityourself",
-            "brick": "building_materials|hardware",
-            "cement": "building_materials|hardware",
-            "pipe": "plumber|hardware",
-            "wire": "electrical|hardware",
-            "electrical": "electrical",
-            "plumbing": "plumber|bathroom_furnishing",
-            "bathroom": "bathroom_furnishing",
-            "kitchen": "kitchen|houseware",
-            "modular": "kitchen|furniture|interior_decoration",
-            "furniture": "furniture",
-            "sofa": "furniture",
-            "bed": "furniture|bed",
-            "chair": "furniture",
-            "table": "furniture",
-            "wardrobe": "furniture",
-            "mattress": "furniture|bed",
-            "curtain": "curtain|interior_decoration",
-            "carpet": "carpet|interior_decoration|flooring",
-            "flooring": "flooring|tiles|carpet",
-            "decor": "interior_decoration",
-            "interior": "interior_decoration|furniture",
-            
-            # Fashion
-            "clothes": "clothes|boutique",
-            "shirt": "clothes",
-            "dress": "clothes|boutique",
-            "saree": "clothes|boutique",
-            "shoe": "shoes",
-            "shoes": "shoes",
-            "footwear": "shoes",
-            "jewellery": "jewelry|jewellery",
-            "jewelry": "jewelry|jewellery",
-            "gold": "jewelry|jewellery",
-            "watch": "watches",
-            "watches": "watches",
-            
-            # Others
-            "grocery": "supermarket|grocery",
-            "medicine": "pharmacy",
-            "medical": "pharmacy|medical_supply",
-            "book": "books",
-            "books": "books",
-            "sport": "sports",
-            "sports": "sports",
-            "toy": "toys",
-            "toys": "toys",
-            "car": "car|car_parts",
-            "bike": "bicycle|motorcycle",
-            "cycle": "bicycle",
-            "tool": "hardware|tools",
-            "tools": "hardware|tools",
-            "hardware": "hardware|doityourself",
-        }
-        
-        if keyword in keyword_to_shop:
-            search_terms.append(keyword_to_shop[keyword])
-    
-    # Combine all search terms
-    if search_terms:
-        # Remove duplicates and join
-        unique_terms = list(set('|'.join(search_terms).split('|')))
-        return {"shop": '|'.join(unique_terms), "keywords": product_keywords}
-    
-    # If no shop mapping found but we have keywords, return just keywords for name search
+    # Return ONLY keywords - NO default shop categories
+    # The Overpass query will search for stores with these keywords in their NAME
     if product_keywords:
         return {"shop": "", "keywords": product_keywords}
     
