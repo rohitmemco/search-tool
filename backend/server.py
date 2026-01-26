@@ -1017,49 +1017,194 @@ def get_direct_vendor_link(source_name: str, product_name: str) -> str:
 # ================== GOOGLE PLACES API - LOCAL STORES ==================
 # City coordinates for location-based searches
 CITY_COORDINATES = {
-    # India
-    "bangalore": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
-    "bengaluru": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
-    "banglore": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
-    "mumbai": {"lat": 19.0760, "lng": 72.8777, "country": "India"},
-    "delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India"},
-    "new delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India"},
-    "chennai": {"lat": 13.0827, "lng": 80.2707, "country": "India"},
-    "hyderabad": {"lat": 17.3850, "lng": 78.4867, "country": "India"},
-    "kolkata": {"lat": 22.5726, "lng": 88.3639, "country": "India"},
-    "pune": {"lat": 18.5204, "lng": 73.8567, "country": "India"},
-    "ahmedabad": {"lat": 23.0225, "lng": 72.5714, "country": "India"},
-    "jaipur": {"lat": 26.9124, "lng": 75.7873, "country": "India"},
-    "lucknow": {"lat": 26.8467, "lng": 80.9462, "country": "India"},
-    "india": {"lat": 20.5937, "lng": 78.9629, "country": "India"},
-    # USA
-    "new york": {"lat": 40.7128, "lng": -74.0060, "country": "USA"},
-    "los angeles": {"lat": 34.0522, "lng": -118.2437, "country": "USA"},
-    "chicago": {"lat": 41.8781, "lng": -87.6298, "country": "USA"},
-    "san francisco": {"lat": 37.7749, "lng": -122.4194, "country": "USA"},
-    "usa": {"lat": 37.0902, "lng": -95.7129, "country": "USA"},
+    # India - Major Cities
+    "bangalore": {"lat": 12.9716, "lng": 77.5946, "country": "India", "name": "Bengaluru"},
+    "bengaluru": {"lat": 12.9716, "lng": 77.5946, "country": "India", "name": "Bengaluru"},
+    "banglore": {"lat": 12.9716, "lng": 77.5946, "country": "India", "name": "Bengaluru"},
+    "mumbai": {"lat": 19.0760, "lng": 72.8777, "country": "India", "name": "Mumbai"},
+    "bombay": {"lat": 19.0760, "lng": 72.8777, "country": "India", "name": "Mumbai"},
+    "delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India", "name": "Delhi"},
+    "new delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India", "name": "Delhi"},
+    "chennai": {"lat": 13.0827, "lng": 80.2707, "country": "India", "name": "Chennai"},
+    "madras": {"lat": 13.0827, "lng": 80.2707, "country": "India", "name": "Chennai"},
+    "hyderabad": {"lat": 17.3850, "lng": 78.4867, "country": "India", "name": "Hyderabad"},
+    "kolkata": {"lat": 22.5726, "lng": 88.3639, "country": "India", "name": "Kolkata"},
+    "calcutta": {"lat": 22.5726, "lng": 88.3639, "country": "India", "name": "Kolkata"},
+    "pune": {"lat": 18.5204, "lng": 73.8567, "country": "India", "name": "Pune"},
+    "ahmedabad": {"lat": 23.0225, "lng": 72.5714, "country": "India", "name": "Ahmedabad"},
+    "jaipur": {"lat": 26.9124, "lng": 75.7873, "country": "India", "name": "Jaipur"},
+    "lucknow": {"lat": 26.8467, "lng": 80.9462, "country": "India", "name": "Lucknow"},
+    "surat": {"lat": 21.1702, "lng": 72.8311, "country": "India", "name": "Surat"},
+    "kochi": {"lat": 9.9312, "lng": 76.2673, "country": "India", "name": "Kochi"},
+    "cochin": {"lat": 9.9312, "lng": 76.2673, "country": "India", "name": "Kochi"},
+    "chandigarh": {"lat": 30.7333, "lng": 76.7794, "country": "India", "name": "Chandigarh"},
+    "indore": {"lat": 22.7196, "lng": 75.8577, "country": "India", "name": "Indore"},
+    "nagpur": {"lat": 21.1458, "lng": 79.0882, "country": "India", "name": "Nagpur"},
+    "bhopal": {"lat": 23.2599, "lng": 77.4126, "country": "India", "name": "Bhopal"},
+    "coimbatore": {"lat": 11.0168, "lng": 76.9558, "country": "India", "name": "Coimbatore"},
+    "visakhapatnam": {"lat": 17.6868, "lng": 83.2185, "country": "India", "name": "Visakhapatnam"},
+    "vizag": {"lat": 17.6868, "lng": 83.2185, "country": "India", "name": "Visakhapatnam"},
+    "patna": {"lat": 25.5941, "lng": 85.1376, "country": "India", "name": "Patna"},
+    "vadodara": {"lat": 22.3072, "lng": 73.1812, "country": "India", "name": "Vadodara"},
+    "goa": {"lat": 15.2993, "lng": 74.1240, "country": "India", "name": "Goa"},
+    "india": {"lat": 20.5937, "lng": 78.9629, "country": "India", "name": "India"},
+    
+    # USA - Major Cities & States
+    "new york": {"lat": 40.7128, "lng": -74.0060, "country": "USA", "name": "New York"},
+    "nyc": {"lat": 40.7128, "lng": -74.0060, "country": "USA", "name": "New York"},
+    "los angeles": {"lat": 34.0522, "lng": -118.2437, "country": "USA", "name": "Los Angeles"},
+    "la": {"lat": 34.0522, "lng": -118.2437, "country": "USA", "name": "Los Angeles"},
+    "chicago": {"lat": 41.8781, "lng": -87.6298, "country": "USA", "name": "Chicago"},
+    "san francisco": {"lat": 37.7749, "lng": -122.4194, "country": "USA", "name": "San Francisco"},
+    "sf": {"lat": 37.7749, "lng": -122.4194, "country": "USA", "name": "San Francisco"},
+    "seattle": {"lat": 47.6062, "lng": -122.3321, "country": "USA", "name": "Seattle"},
+    "boston": {"lat": 42.3601, "lng": -71.0589, "country": "USA", "name": "Boston"},
+    "houston": {"lat": 29.7604, "lng": -95.3698, "country": "USA", "name": "Houston"},
+    "dallas": {"lat": 32.7767, "lng": -96.7970, "country": "USA", "name": "Dallas"},
+    "austin": {"lat": 30.2672, "lng": -97.7431, "country": "USA", "name": "Austin"},
+    "miami": {"lat": 25.7617, "lng": -80.1918, "country": "USA", "name": "Miami"},
+    "denver": {"lat": 39.7392, "lng": -104.9903, "country": "USA", "name": "Denver"},
+    "phoenix": {"lat": 33.4484, "lng": -112.0740, "country": "USA", "name": "Phoenix"},
+    "san diego": {"lat": 32.7157, "lng": -117.1611, "country": "USA", "name": "San Diego"},
+    "san jose": {"lat": 37.3382, "lng": -121.8863, "country": "USA", "name": "San Jose"},
+    "california": {"lat": 36.7783, "lng": -119.4179, "country": "USA", "name": "California"},
+    "texas": {"lat": 31.9686, "lng": -99.9018, "country": "USA", "name": "Texas"},
+    "florida": {"lat": 27.6648, "lng": -81.5158, "country": "USA", "name": "Florida"},
+    "usa": {"lat": 37.0902, "lng": -95.7129, "country": "USA", "name": "USA"},
+    "america": {"lat": 37.0902, "lng": -95.7129, "country": "USA", "name": "USA"},
+    
     # UK
-    "london": {"lat": 51.5074, "lng": -0.1278, "country": "UK"},
-    "manchester": {"lat": 53.4808, "lng": -2.2426, "country": "UK"},
-    "uk": {"lat": 55.3781, "lng": -3.4360, "country": "UK"},
-    # UAE
-    "dubai": {"lat": 25.2048, "lng": 55.2708, "country": "UAE"},
-    "abu dhabi": {"lat": 24.4539, "lng": 54.3773, "country": "UAE"},
-    "uae": {"lat": 23.4241, "lng": 53.8478, "country": "UAE"},
-    # Others
-    "tokyo": {"lat": 35.6762, "lng": 139.6503, "country": "Japan"},
-    "sydney": {"lat": -33.8688, "lng": 151.2093, "country": "Australia"},
-    "toronto": {"lat": 43.6532, "lng": -79.3832, "country": "Canada"},
-    "paris": {"lat": 48.8566, "lng": 2.3522, "country": "France"},
-    "berlin": {"lat": 52.5200, "lng": 13.4050, "country": "Germany"},
+    "london": {"lat": 51.5074, "lng": -0.1278, "country": "UK", "name": "London"},
+    "manchester": {"lat": 53.4808, "lng": -2.2426, "country": "UK", "name": "Manchester"},
+    "birmingham": {"lat": 52.4862, "lng": -1.8904, "country": "UK", "name": "Birmingham"},
+    "liverpool": {"lat": 53.4084, "lng": -2.9916, "country": "UK", "name": "Liverpool"},
+    "edinburgh": {"lat": 55.9533, "lng": -3.1883, "country": "UK", "name": "Edinburgh"},
+    "glasgow": {"lat": 55.8642, "lng": -4.2518, "country": "UK", "name": "Glasgow"},
+    "uk": {"lat": 55.3781, "lng": -3.4360, "country": "UK", "name": "UK"},
+    "england": {"lat": 52.3555, "lng": -1.1743, "country": "UK", "name": "England"},
+    "britain": {"lat": 55.3781, "lng": -3.4360, "country": "UK", "name": "UK"},
+    
+    # UAE & Middle East
+    "dubai": {"lat": 25.2048, "lng": 55.2708, "country": "UAE", "name": "Dubai"},
+    "abu dhabi": {"lat": 24.4539, "lng": 54.3773, "country": "UAE", "name": "Abu Dhabi"},
+    "sharjah": {"lat": 25.3463, "lng": 55.4209, "country": "UAE", "name": "Sharjah"},
+    "uae": {"lat": 23.4241, "lng": 53.8478, "country": "UAE", "name": "UAE"},
+    "saudi": {"lat": 23.8859, "lng": 45.0792, "country": "Saudi Arabia", "name": "Saudi Arabia"},
+    "riyadh": {"lat": 24.7136, "lng": 46.6753, "country": "Saudi Arabia", "name": "Riyadh"},
+    "qatar": {"lat": 25.3548, "lng": 51.1839, "country": "Qatar", "name": "Qatar"},
+    "doha": {"lat": 25.2854, "lng": 51.5310, "country": "Qatar", "name": "Doha"},
+    "kuwait": {"lat": 29.3759, "lng": 47.9774, "country": "Kuwait", "name": "Kuwait"},
+    "bahrain": {"lat": 26.0667, "lng": 50.5577, "country": "Bahrain", "name": "Bahrain"},
+    
+    # Asia Pacific
+    "tokyo": {"lat": 35.6762, "lng": 139.6503, "country": "Japan", "name": "Tokyo"},
+    "osaka": {"lat": 34.6937, "lng": 135.5023, "country": "Japan", "name": "Osaka"},
+    "japan": {"lat": 36.2048, "lng": 138.2529, "country": "Japan", "name": "Japan"},
+    "singapore": {"lat": 1.3521, "lng": 103.8198, "country": "Singapore", "name": "Singapore"},
+    "hong kong": {"lat": 22.3193, "lng": 114.1694, "country": "Hong Kong", "name": "Hong Kong"},
+    "hongkong": {"lat": 22.3193, "lng": 114.1694, "country": "Hong Kong", "name": "Hong Kong"},
+    "seoul": {"lat": 37.5665, "lng": 126.9780, "country": "South Korea", "name": "Seoul"},
+    "korea": {"lat": 35.9078, "lng": 127.7669, "country": "South Korea", "name": "South Korea"},
+    "bangkok": {"lat": 13.7563, "lng": 100.5018, "country": "Thailand", "name": "Bangkok"},
+    "thailand": {"lat": 15.8700, "lng": 100.9925, "country": "Thailand", "name": "Thailand"},
+    "kuala lumpur": {"lat": 3.1390, "lng": 101.6869, "country": "Malaysia", "name": "Kuala Lumpur"},
+    "kl": {"lat": 3.1390, "lng": 101.6869, "country": "Malaysia", "name": "Kuala Lumpur"},
+    "malaysia": {"lat": 4.2105, "lng": 101.9758, "country": "Malaysia", "name": "Malaysia"},
+    "jakarta": {"lat": -6.2088, "lng": 106.8456, "country": "Indonesia", "name": "Jakarta"},
+    "indonesia": {"lat": -0.7893, "lng": 113.9213, "country": "Indonesia", "name": "Indonesia"},
+    "manila": {"lat": 14.5995, "lng": 120.9842, "country": "Philippines", "name": "Manila"},
+    "philippines": {"lat": 12.8797, "lng": 121.7740, "country": "Philippines", "name": "Philippines"},
+    "vietnam": {"lat": 14.0583, "lng": 108.2772, "country": "Vietnam", "name": "Vietnam"},
+    "hanoi": {"lat": 21.0285, "lng": 105.8542, "country": "Vietnam", "name": "Hanoi"},
+    "ho chi minh": {"lat": 10.8231, "lng": 106.6297, "country": "Vietnam", "name": "Ho Chi Minh City"},
+    
+    # Australia & New Zealand
+    "sydney": {"lat": -33.8688, "lng": 151.2093, "country": "Australia", "name": "Sydney"},
+    "melbourne": {"lat": -37.8136, "lng": 144.9631, "country": "Australia", "name": "Melbourne"},
+    "brisbane": {"lat": -27.4698, "lng": 153.0251, "country": "Australia", "name": "Brisbane"},
+    "perth": {"lat": -31.9505, "lng": 115.8605, "country": "Australia", "name": "Perth"},
+    "australia": {"lat": -25.2744, "lng": 133.7751, "country": "Australia", "name": "Australia"},
+    "auckland": {"lat": -36.8485, "lng": 174.7633, "country": "New Zealand", "name": "Auckland"},
+    "new zealand": {"lat": -40.9006, "lng": 174.8860, "country": "New Zealand", "name": "New Zealand"},
+    
+    # Canada
+    "toronto": {"lat": 43.6532, "lng": -79.3832, "country": "Canada", "name": "Toronto"},
+    "vancouver": {"lat": 49.2827, "lng": -123.1207, "country": "Canada", "name": "Vancouver"},
+    "montreal": {"lat": 45.5017, "lng": -73.5673, "country": "Canada", "name": "Montreal"},
+    "calgary": {"lat": 51.0447, "lng": -114.0719, "country": "Canada", "name": "Calgary"},
+    "ottawa": {"lat": 45.4215, "lng": -75.6972, "country": "Canada", "name": "Ottawa"},
+    "canada": {"lat": 56.1304, "lng": -106.3468, "country": "Canada", "name": "Canada"},
+    
+    # Europe
+    "paris": {"lat": 48.8566, "lng": 2.3522, "country": "France", "name": "Paris"},
+    "france": {"lat": 46.2276, "lng": 2.2137, "country": "France", "name": "France"},
+    "berlin": {"lat": 52.5200, "lng": 13.4050, "country": "Germany", "name": "Berlin"},
+    "munich": {"lat": 48.1351, "lng": 11.5820, "country": "Germany", "name": "Munich"},
+    "frankfurt": {"lat": 50.1109, "lng": 8.6821, "country": "Germany", "name": "Frankfurt"},
+    "germany": {"lat": 51.1657, "lng": 10.4515, "country": "Germany", "name": "Germany"},
+    "amsterdam": {"lat": 52.3676, "lng": 4.9041, "country": "Netherlands", "name": "Amsterdam"},
+    "netherlands": {"lat": 52.1326, "lng": 5.2913, "country": "Netherlands", "name": "Netherlands"},
+    "rome": {"lat": 41.9028, "lng": 12.4964, "country": "Italy", "name": "Rome"},
+    "milan": {"lat": 45.4642, "lng": 9.1900, "country": "Italy", "name": "Milan"},
+    "italy": {"lat": 41.8719, "lng": 12.5674, "country": "Italy", "name": "Italy"},
+    "madrid": {"lat": 40.4168, "lng": -3.7038, "country": "Spain", "name": "Madrid"},
+    "barcelona": {"lat": 41.3851, "lng": 2.1734, "country": "Spain", "name": "Barcelona"},
+    "spain": {"lat": 40.4637, "lng": -3.7492, "country": "Spain", "name": "Spain"},
+    "moscow": {"lat": 55.7558, "lng": 37.6173, "country": "Russia", "name": "Moscow"},
+    "russia": {"lat": 61.5240, "lng": 105.3188, "country": "Russia", "name": "Russia"},
+    "zurich": {"lat": 47.3769, "lng": 8.5417, "country": "Switzerland", "name": "Zurich"},
+    "switzerland": {"lat": 46.8182, "lng": 8.2275, "country": "Switzerland", "name": "Switzerland"},
+    "vienna": {"lat": 48.2082, "lng": 16.3738, "country": "Austria", "name": "Vienna"},
+    "austria": {"lat": 47.5162, "lng": 14.5501, "country": "Austria", "name": "Austria"},
+    "stockholm": {"lat": 59.3293, "lng": 18.0686, "country": "Sweden", "name": "Stockholm"},
+    "sweden": {"lat": 60.1282, "lng": 18.6435, "country": "Sweden", "name": "Sweden"},
+    "dublin": {"lat": 53.3498, "lng": -6.2603, "country": "Ireland", "name": "Dublin"},
+    "ireland": {"lat": 53.1424, "lng": -7.6921, "country": "Ireland", "name": "Ireland"},
+    
+    # China
+    "beijing": {"lat": 39.9042, "lng": 116.4074, "country": "China", "name": "Beijing"},
+    "shanghai": {"lat": 31.2304, "lng": 121.4737, "country": "China", "name": "Shanghai"},
+    "shenzhen": {"lat": 22.5431, "lng": 114.0579, "country": "China", "name": "Shenzhen"},
+    "guangzhou": {"lat": 23.1291, "lng": 113.2644, "country": "China", "name": "Guangzhou"},
+    "china": {"lat": 35.8617, "lng": 104.1954, "country": "China", "name": "China"},
+    
+    # Africa
+    "johannesburg": {"lat": -26.2041, "lng": 28.0473, "country": "South Africa", "name": "Johannesburg"},
+    "cape town": {"lat": -33.9249, "lng": 18.4241, "country": "South Africa", "name": "Cape Town"},
+    "south africa": {"lat": -30.5595, "lng": 22.9375, "country": "South Africa", "name": "South Africa"},
+    "cairo": {"lat": 30.0444, "lng": 31.2357, "country": "Egypt", "name": "Cairo"},
+    "egypt": {"lat": 26.8206, "lng": 30.8025, "country": "Egypt", "name": "Egypt"},
+    "lagos": {"lat": 6.5244, "lng": 3.3792, "country": "Nigeria", "name": "Lagos"},
+    "nigeria": {"lat": 9.0820, "lng": 8.6753, "country": "Nigeria", "name": "Nigeria"},
+    "nairobi": {"lat": -1.2921, "lng": 36.8219, "country": "Kenya", "name": "Nairobi"},
+    "kenya": {"lat": -0.0236, "lng": 37.9062, "country": "Kenya", "name": "Kenya"},
+    
+    # South America
+    "sao paulo": {"lat": -23.5505, "lng": -46.6333, "country": "Brazil", "name": "São Paulo"},
+    "rio de janeiro": {"lat": -22.9068, "lng": -43.1729, "country": "Brazil", "name": "Rio de Janeiro"},
+    "brazil": {"lat": -14.2350, "lng": -51.9253, "country": "Brazil", "name": "Brazil"},
+    "buenos aires": {"lat": -34.6037, "lng": -58.3816, "country": "Argentina", "name": "Buenos Aires"},
+    "argentina": {"lat": -38.4161, "lng": -63.6167, "country": "Argentina", "name": "Argentina"},
+    "mexico city": {"lat": 19.4326, "lng": -99.1332, "country": "Mexico", "name": "Mexico City"},
+    "mexico": {"lat": 23.6345, "lng": -102.5528, "country": "Mexico", "name": "Mexico"},
 }
 
 def get_city_from_query(query: str) -> Optional[Dict]:
-    """Extract city coordinates from search query"""
+    """Extract city coordinates from search query - supports 150+ cities worldwide"""
     query_lower = query.lower()
-    for city_name, coords in CITY_COORDINATES.items():
+    
+    # Sort by length (longer names first) to match "new york" before "york"
+    sorted_cities = sorted(CITY_COORDINATES.keys(), key=len, reverse=True)
+    
+    for city_name in sorted_cities:
         if city_name in query_lower:
-            return {"name": city_name.title(), **coords}
+            coords = CITY_COORDINATES[city_name]
+            return {
+                "name": coords.get("name", city_name.title()),
+                "lat": coords["lat"],
+                "lng": coords["lng"],
+                "country": coords["country"]
+            }
     return None
 
 def get_store_type_from_query(query: str) -> str:
