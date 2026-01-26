@@ -1056,15 +1056,20 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
                     source_name = item.get("source", "Google Shopping")
+                    product_title = item.get("title", "Unknown Product")
+                    
+                    # Generate direct vendor link instead of Google redirect
+                    direct_link = get_direct_vendor_link(source_name, product_title)
                     
                     # Only include REAL data from SerpAPI - no fake/generated data
                     product_data = {
-                        "name": item.get("title", "Unknown Product"),
+                        "name": product_title,
                         "price": float(price),
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
                         "source": source_name,
-                        "source_url": item.get("link", ""),
+                        "source_url": direct_link,
+                        "google_shopping_url": item.get("link", ""),  # Keep Google link as backup
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating") if item.get("rating") else None,
                         "availability": "In Stock",
@@ -1078,6 +1083,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         # Real vendor info from SerpAPI (only what's actually available)
                         "vendor": {
                             "vendor_name": source_name,
+                            "vendor_website": direct_link,
                             "is_real_data": True,
                             "data_source": "Google Shopping"
                         }
@@ -1090,15 +1096,20 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
                     source_name = item.get("source", "Google Shopping")
+                    product_title = item.get("title", "Unknown Product")
+                    
+                    # Generate direct vendor link instead of Google redirect
+                    direct_link = get_direct_vendor_link(source_name, product_title)
                     
                     # Only include REAL data from SerpAPI - no fake/generated data
                     product_data = {
-                        "name": item.get("title", "Unknown Product"),
+                        "name": product_title,
                         "price": float(price),
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
                         "source": source_name,
-                        "source_url": item.get("product_link", item.get("link", "")),
+                        "source_url": direct_link,
+                        "google_shopping_url": item.get("product_link", item.get("link", "")),  # Keep Google link as backup
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating") if item.get("rating") else None,
                         "availability": "In Stock" if not item.get("second_hand_condition") else "Used",
@@ -1112,6 +1123,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         # Real vendor info from SerpAPI (only what's actually available)
                         "vendor": {
                             "vendor_name": source_name,
+                            "vendor_website": direct_link,
                             "is_real_data": True,
                             "data_source": "Google Shopping"
                         }
