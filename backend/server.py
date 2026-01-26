@@ -1033,9 +1033,15 @@ def get_direct_vendor_link(source_name: str, product_name: str) -> str:
     if source_lower in vendor_urls:
         return vendor_urls[source_lower]
     
-    # Try partial match
+    # Try partial match - but be more strict to avoid false positives
+    # Only match if the vendor key is a significant part of the source name
     for vendor_key, url in vendor_urls.items():
-        if vendor_key in source_lower or source_lower in vendor_key:
+        # Skip very short keys to avoid false matches
+        if len(vendor_key) < 4:
+            continue
+        # Check if vendor key is contained in source (but not vice versa to avoid "mi" matching everything)
+        if vendor_key in source_lower:
+            return url
             return url
     
     # Return None to signal we should use the original SerpAPI link
