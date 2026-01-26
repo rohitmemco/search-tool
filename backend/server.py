@@ -79,6 +79,9 @@ class SearchResponse(BaseModel):
     data_sources: List[Dict[str, Any]]
     # Advanced filter options extracted from AI
     available_filters: Optional[Dict[str, Any]] = None
+    # Local stores from Google Places API
+    local_stores: Optional[List[Dict[str, Any]]] = None
+    local_stores_city: Optional[str] = None
 
 # ================== CURRENCY DATA ==================
 CURRENCY_DATA = {
