@@ -1,0 +1,93 @@
+{
+  "summary": "Backend testing completed for Local Store Search - Product-to-Shop Relevance Mapping. All 11 new tests passed. The bug fixes are verified: 1) 'fan in bangalore' now returns electronics stores (Adeshwara Electronics, Voltas, Sony Centre, Cromā) instead of bakeries, 2) 'ceiling lights in bangalore' returns lighting stores instead of car dealerships, 3) 'sliding windows in bangalore' returns hardware/glass stores (Fenesta Windows, Karnakata Hardware Store) instead of financial services, 4) 'crompton fan in bangalore' returns electronics stores instead of fruit/vegetable stores.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/search - local stores",
+        "issue": "New York city returns 0 local stores from OpenStreetMap Overpass API - this is an OSM data coverage limitation, not a code bug",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "test_fan_in_bangalore_returns_electronics_stores - PASSED: 30 electronics stores returned, 0 bakeries",
+    "test_crompton_fan_in_bangalore_returns_electronics - PASSED: 30 electronics stores returned, 0 fruit/vegetable stores",
+    "test_ceiling_lights_in_bangalore_returns_lighting_stores - PASSED: 30 lighting stores returned, 0 car dealerships",
+    "test_sliding_windows_in_bangalore_returns_hardware_stores - PASSED: 30 hardware/glass stores returned, 0 financial services",
+    "test_mirror_in_bangalore_returns_relevant_stores - PASSED: 30 interior/glass stores returned",
+    "test_fan_keyword_maps_to_electronics - PASSED",
+    "test_light_keyword_maps_to_lighting - PASSED",
+    "test_window_keyword_maps_to_hardware - PASSED",
+    "test_no_random_shops_returned - PASSED: No unrelated shops (bakeries, restaurants, etc.) returned",
+    "test_search_endpoint_returns_200 - PASSED",
+    "test_search_with_city_returns_local_stores - PASSED"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_local_store_relevance.py",
+    "/app/test_reports/pytest/pytest_local_store_relevance.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "The keyword_to_shop dictionary in get_osm_categories_extended() now correctly maps product keywords to relevant shop types",
+    "The Overpass query fix ensures only specific shop types are searched when shop_regex is available, preventing random shops from being returned",
+    "Sample stores returned for 'fan in bangalore': Adeshwara Electronics, Voltas, Sony Centre, Cromā - all electronics stores",
+    "Sample stores returned for 'sliding windows in bangalore': Fenesta Windows, Karnakata Hardware Store, Metal Works Shop - all hardware/glass stores"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_local_store_relevance.py"
+  ],
+
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "N/A - backend only testing"
+  },
+
+  "seed_data_creation": "None - using real OpenStreetMap Overpass API and SerpAPI",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Local store search relevance bug is fixed. Tests verify: 1) 'fan' searches return electronics stores, not bakeries, 2) 'ceiling lights' searches return lighting stores, not car dealerships, 3) 'sliding windows' searches return hardware/glass stores, not financial services, 4) 'crompton fan' searches return electronics stores, not fruit vendors. The keyword_to_shop dictionary now includes mappings for fan, fans, crompton, ceiling, light, lights, lamp, window, windows, sliding, door, ac, refrigerator, etc.",
+
+  "verified_bug_fixes": {
+    "bug_1": {
+      "issue": "'fan in bangalore' showing bakeries",
+      "fix_verified": true,
+      "evidence": "30 electronics stores returned (Adeshwara Electronics, Voltas, Sony Centre, Cromā), 0 bakeries"
+    },
+    "bug_2": {
+      "issue": "'sliding windows in bangalore' showing financial services",
+      "fix_verified": true,
+      "evidence": "30 hardware/glass stores returned (Fenesta Windows, Karnakata Hardware Store, Metal Works Shop), 0 financial services"
+    },
+    "bug_3": {
+      "issue": "'ceiling lights in bangalore' showing car dealerships",
+      "fix_verified": true,
+      "evidence": "30 lighting/electronics stores returned (City Lights Supermarket, Adeshwara Electronics, Voltas, Sony Centre), 0 car dealerships"
+    },
+    "bug_4": {
+      "issue": "'crompton fan in bangalore' showing fruit/vegetable stores",
+      "fix_verified": true,
+      "evidence": "30 electronics stores returned, 0 fruit/vegetable stores"
+    }
+  },
+
+  "fix_details": {
+    "fix_1_keyword_mappings": "Added keyword_to_shop mappings: fan->electronics|electrical|houseware, fans->electronics|electrical|houseware, crompton->electronics|electrical|houseware, ceiling->electronics|electrical|lighting, light->electronics|electrical|lighting, lights->electronics|electrical|lighting, lamp->electronics|electrical|lighting, window->glaziery|glass|doityourself|hardware, windows->glaziery|glass|doityourself|hardware, sliding->glaziery|glass|doityourself|hardware",
+    "fix_2_overpass_query": "Fixed Overpass query to ONLY search for specific shop types when shop_regex is available, instead of returning ALL shops when no category found"
+  }
+}
