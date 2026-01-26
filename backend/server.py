@@ -1255,37 +1255,8 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         shop_categories = get_osm_categories_extended(query)
         city_name = city_info.get("name", city).title()
         
-        # Map common city names to OSM area names
-        osm_area_names = {
-            "bangalore": "Bengaluru",
-            "bengaluru": "Bengaluru",
-            "banglore": "Bengaluru",
-            "mumbai": "Mumbai",
-            "delhi": "Delhi",
-            "new delhi": "Delhi",
-            "chennai": "Chennai",
-            "hyderabad": "Hyderabad",
-            "kolkata": "Kolkata",
-            "pune": "Pune",
-            "ahmedabad": "Ahmedabad",
-            "jaipur": "Jaipur",
-            "lucknow": "Lucknow",
-            "new york": "New York",
-            "los angeles": "Los Angeles",
-            "chicago": "Chicago",
-            "san francisco": "San Francisco",
-            "london": "London",
-            "manchester": "Manchester",
-            "dubai": "Dubai",
-            "abu dhabi": "Abu Dhabi",
-            "tokyo": "Tokyo",
-            "sydney": "Sydney",
-            "toronto": "Toronto",
-            "paris": "Paris",
-            "berlin": "Berlin",
-        }
-        
-        osm_area = osm_area_names.get(city_name.lower(), city_name)
+        # Get OSM area name from city_info (already properly formatted)
+        osm_area = city_info.get("name", city_name)
         
         logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
         
