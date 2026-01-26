@@ -1430,8 +1430,15 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
               )}
             </div>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{product.vendor.vendor_name}</p>
-            {product.vendor.data_source && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">via {product.vendor.data_source}</p>
+            {product.vendor.vendor_website && (
+              <a 
+                href={product.vendor.vendor_website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline truncate block mt-1"
+              >
+                Visit Website →
+              </a>
             )}
           </div>
         )}
@@ -1440,10 +1447,10 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
           href={product.source_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg w-full justify-center"
           data-testid={`view-source-${index}`}
         >
-          View on {product.source}
+          Shop on {product.source}
           <ExternalLink className="w-4 h-4" />
         </a>
       </div>
