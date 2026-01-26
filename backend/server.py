@@ -1471,46 +1471,84 @@ out body {max_results};'''
         return []
 
 def get_osm_categories_extended(query: str) -> Dict[str, str]:
-    """Map product query to extended OpenStreetMap categories including factories, wholesale, manufacturing"""
+    """Map product query to specific OpenStreetMap shop categories - ONLY relevant stores"""
     query_lower = query.lower()
     
-    # Base shop categories - order matters, more specific first
-    if any(word in query_lower for word in ["tap", "faucet", "pipe", "plumbing", "valve", "fitting", "sanitary"]):
-        return {"shop": "doityourself|hardware|bathroom_furnishing|plumber", "craft": "plumber"}
-    elif any(word in query_lower for word in ["brick", "cement", "sand", "concrete", "building material", "construction"]):
-        return {"shop": "doityourself|hardware|building_materials", "craft": "builder"}
-    elif any(word in query_lower for word in ["paint", "color", "wall", "coating"]):
-        return {"shop": "doityourself|paint|hardware", "craft": "painter"}
-    elif any(word in query_lower for word in ["wire", "cable", "electrical", "switch", "socket", "mcb"]):
-        return {"shop": "doityourself|electrical|hardware", "craft": "electrician"}
-    elif any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
-        return {"shop": "mobile_phone|electronics|computer", "craft": "electronics"}
-    elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
+    # Plumbing & Bathroom - taps, faucets, pipes
+    if any(word in query_lower for word in ["tap", "faucet", "pipe", "plumbing", "valve", "fitting", "sanitary", "bathroom", "toilet", "sink", "shower"]):
+        return {"shop": "hardware|doityourself|bathroom_furnishing", "craft": "plumber"}
+    
+    # Construction materials - bricks, cement, sand
+    elif any(word in query_lower for word in ["brick", "cement", "sand", "concrete", "building material", "construction", "gravel", "aggregate"]):
+        return {"shop": "hardware|doityourself|building_materials", "craft": "builder"}
+    
+    # Paint & Coatings
+    elif any(word in query_lower for word in ["paint", "color", "coating", "primer", "varnish", "enamel"]):
+        return {"shop": "paint|hardware|doityourself", "craft": "painter"}
+    
+    # Electrical supplies
+    elif any(word in query_lower for word in ["wire", "cable", "electrical", "switch", "socket", "mcb", "circuit", "wiring"]):
+        return {"shop": "electrical|hardware|doityourself", "craft": "electrician"}
+    
+    # Mobile phones
+    elif any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme", "smartphone"]):
+        return {"shop": "mobile_phone|electronics", "craft": "electronics"}
+    
+    # Computers & Laptops
+    elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook", "notebook"]):
         return {"shop": "computer|electronics", "craft": "electronics"}
-    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics", "camera", "headphone", "earphone", "speaker", "audio"]):
-        return {"shop": "electronics|hifi|camera", "craft": "electronics"}
-    elif any(word in query_lower for word in ["watch", "smartwatch"]):
+    
+    # Electronics & Appliances
+    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics", "camera", "headphone", "earphone", "speaker", "audio", "appliance"]):
+        return {"shop": "electronics|hifi", "craft": "electronics"}
+    
+    # Watches
+    elif any(word in query_lower for word in ["watch", "smartwatch", "clock"]):
         return {"shop": "watches|jewelry", "craft": "watchmaker"}
-    elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
-        return {"shop": "doityourself|bathroom_furnishing|tiles|hardware", "craft": "carpenter"}
-    elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
-        return {"shop": "furniture", "craft": "carpenter|furniture"}
-    elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
-        return {"shop": "clothes|boutique|fashion", "craft": "tailor|dressmaker"}
-    elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal"]):
+    
+    # Tiles & Flooring
+    elif any(word in query_lower for word in ["tile", "flooring", "ceramic", "marble", "granite", "vitrified"]):
+        return {"shop": "tiles|doityourself|hardware", "craft": "tiler"}
+    
+    # Kitchen
+    elif any(word in query_lower for word in ["kitchen", "chimney", "hob", "cooktop", "oven", "microwave"]):
+        return {"shop": "kitchen|houseware|electronics", "craft": ""}
+    
+    # Furniture
+    elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair", "wardrobe", "cupboard"]):
+        return {"shop": "furniture", "craft": "carpenter"}
+    
+    # Clothing
+    elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion", "saree", "kurta", "jeans"]):
+        return {"shop": "clothes|boutique", "craft": "tailor"}
+    
+    # Footwear
+    elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal", "slipper", "boot"]):
         return {"shop": "shoes", "craft": "shoemaker"}
-    elif any(word in query_lower for word in ["jewel", "gold", "diamond", "ring", "necklace"]):
+    
+    # Jewelry
+    elif any(word in query_lower for word in ["jewel", "gold", "diamond", "ring", "necklace", "silver", "ornament"]):
         return {"shop": "jewelry|jewellery", "craft": "jeweller"}
-    elif any(word in query_lower for word in ["grocery", "food", "vegetable", "fruit"]):
-        return {"shop": "supermarket|greengrocer|convenience", "craft": ""}
-    elif any(word in query_lower for word in ["car", "automobile", "vehicle"]):
-        return {"shop": "car|car_parts", "craft": "car_repair"}
+    
+    # Grocery & Food
+    elif any(word in query_lower for word in ["grocery", "food", "vegetable", "fruit", "rice", "dal", "oil"]):
+        return {"shop": "supermarket|grocery|convenience", "craft": ""}
+    
+    # Automobile
+    elif any(word in query_lower for word in ["car", "automobile", "vehicle", "tyre", "tire", "battery"]):
+        return {"shop": "car|car_parts|car_repair", "craft": "car_repair"}
+    
+    # Bicycle
     elif any(word in query_lower for word in ["bike", "bicycle", "cycle"]):
         return {"shop": "bicycle", "craft": "bicycle"}
-    elif any(word in query_lower for word in ["tool", "hardware", "screw", "nail", "drill"]):
-        return {"shop": "doityourself|hardware|tools", "craft": ""}
+    
+    # Tools & Hardware (general)
+    elif any(word in query_lower for word in ["tool", "hardware", "screw", "nail", "drill", "hammer", "wrench"]):
+        return {"shop": "hardware|doityourself|tools", "craft": ""}
+    
+    # Default: Hardware stores (most generic for products)
     else:
-        return {"shop": "doityourself|hardware|wholesale|department_store", "craft": ""}
+        return {"shop": "hardware|doityourself", "craft": ""}
 
 def get_osm_shop_category(query: str) -> str:
     """Map product query to OpenStreetMap shop tag"""
