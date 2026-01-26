@@ -1303,19 +1303,31 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
             return []
         
         # Build dynamic Overpass query - search by shop type AND/OR name containing keywords
-        # This makes it work like online search - finding stores relevant to the product
-        name_search = ""
+        # IMPORTANT: Only search for specific shop types OR shops with product keywords in name
+        # DO NOT return all shops when no category is found
+        
+        query_parts = []
+        
+        # Only add shop type search if we have specific shop categories
+        if shop_regex:
+            query_parts.append(f'node["shop"~"{shop_regex}"](area.searchArea);')
+            query_parts.append(f'way["shop"~"{shop_regex}"](area.searchArea);')
+        
+        # Search for stores with product keywords in their name (must have shop tag)
         if product_keywords:
-            # Search for stores with product keywords in their name
             keyword_regex = '|'.join(product_keywords)
-            name_search = f'node["name"~"{keyword_regex}",i]["shop"](area.searchArea);'
+            query_parts.append(f'node["name"~"{keyword_regex}",i]["shop"](area.searchArea);')
+            query_parts.append(f'way["name"~"{keyword_regex}",i]["shop"](area.searchArea);')
+        
+        # If no query parts, return empty
+        if not query_parts:
+            logger.info("No valid query parts generated, skipping local store search")
+            return []
         
         overpass_query = f'''[out:json][timeout:25];
 area["name"="{osm_area}"]->.searchArea;
 (
-  node["shop"~"{shop_regex}"](area.searchArea);
-  way["shop"~"{shop_regex}"](area.searchArea);
-  {name_search}
+  {chr(10).join(query_parts)}
 );
 out body {max_results * 2};'''
         
