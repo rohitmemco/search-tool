@@ -30,6 +30,13 @@ Build a comprehensive web-based application that enables users to search for any
 
 ## What's Been Implemented
 
+### Jan 26, 2026 - P0 Bug Fix: Product-Specific Local Store Search ✅ FIXED
+- ✅ **Fixed Keyword Extraction**: City names (bangalore, hyderabad, london, etc.) are now properly excluded from product keywords
+- ✅ **Fixed Multi-Word City Detection**: Cities like "new york", "san francisco", "abu dhabi" are properly handled
+- ✅ **Word Boundary Matching**: Added regex word boundary checks to prevent false positives (e.g., "tiles" no longer matches "textiles")
+- ✅ **Improved Relevance Filtering**: Stores are now correctly marked as relevant based on product keywords, not city names
+- ✅ **Comprehensive Testing**: 14 backend tests created and all passed
+
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
 - ✅ **Info Banner**: Yellow warning banner directs users to "Local Stores" tab for direct contact information
