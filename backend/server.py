@@ -1580,8 +1580,14 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                     source_name = item.get("source", "Google Shopping")
                     product_title = item.get("title", "Unknown Product")
                     
-                    # Generate direct vendor link instead of Google redirect
+                    # Try to generate direct vendor link
                     direct_link = get_direct_vendor_link(source_name, product_title)
+                    
+                    # Get the actual Google Shopping link from SerpAPI
+                    google_shopping_link = item.get("link") or ""
+                    
+                    # Use our vendor link if we have a mapping, otherwise use Google Shopping link
+                    final_url = direct_link if direct_link else google_shopping_link
                     
                     # Only include REAL data from SerpAPI - no fake/generated data
                     product_data = {
@@ -1590,9 +1596,8 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
                         "source": source_name,
-                        # Use direct vendor link for better UX
-                        "source_url": direct_link,  # Direct to vendor website
-                        "google_shopping_url": item.get("link", ""),  # Keep Google link as backup
+                        "source_url": final_url,  # Best available link
+                        "google_shopping_url": google_shopping_link,  # Keep Google link as backup
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating") if item.get("rating") else None,
                         "availability": "In Stock",
@@ -1606,7 +1611,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         # Real vendor info from SerpAPI (only what's actually available)
                         "vendor": {
                             "vendor_name": source_name,
-                            "vendor_website": direct_link,  # Direct to vendor website
+                            "vendor_website": final_url,
                             "is_real_data": True,
                             "data_source": "Google Shopping"
                         }
