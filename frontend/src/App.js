@@ -1579,79 +1579,126 @@ const LocalStoresSection = ({ localStores, city }) => {
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{store.name}</h4>
+                <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{store.name || "Unknown Store"}</h4>
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {store.categories?.filter(c => c).slice(0, 2).map((cat, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs">{cat}</Badge>
-                  ))}
+                  {store.categories?.filter(c => c).length > 0 ? (
+                    store.categories.filter(c => c).slice(0, 2).map((cat, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">{cat}</Badge>
+                    ))
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-slate-400">Category not available</Badge>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                {store.is_open_now !== null && (
+                {store.is_open_now !== null ? (
                   <Badge className={store.is_open_now ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"}>
                     {store.is_open_now ? "Open Now" : "Closed"}
                   </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-xs text-slate-400">Hours unknown</Badge>
                 )}
-                {store.rating && (
+                {store.rating ? (
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                     <span className="text-sm font-medium">{store.rating}</span>
                   </div>
+                ) : null}
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-sm border-t border-slate-100 dark:border-slate-700 pt-3">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Store Details</p>
+              
+              {/* Address */}
+              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
+                <MapPin className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                {store.address ? (
+                  <span className="line-clamp-2">{store.address}</span>
+                ) : (
+                  <span className="text-slate-400 italic">Address not available</span>
+                )}
+              </div>
+              
+              {/* Phone */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Phone className="w-4 h-4 text-blue-500" />
+                {store.phone ? (
+                  <a href={`tel:${store.phone}`} className="hover:text-blue-600 hover:underline">{store.phone}</a>
+                ) : (
+                  <span className="text-slate-400 italic">Phone not available</span>
+                )}
+              </div>
+              
+              {/* Website */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Globe className="w-4 h-4 text-purple-500" />
+                {store.website ? (
+                  <a href={store.website} target="_blank" rel="noopener noreferrer" className="hover:text-purple-600 hover:underline truncate">
+                    Visit Website
+                  </a>
+                ) : (
+                  <span className="text-slate-400 italic">Website not available</span>
+                )}
+              </div>
+              
+              {/* Distance */}
+              <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                <Building2 className="w-3 h-3" />
+                {store.distance_meters ? (
+                  <span>{(store.distance_meters / 1000).toFixed(1)} km from city center</span>
+                ) : (
+                  <span className="italic">Distance not available</span>
+                )}
+              </div>
+              
+              {/* Opening Hours */}
+              <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                <Clock className="w-3 h-3 mt-0.5" />
+                {store.opening_hours?.length > 0 ? (
+                  <span className="line-clamp-1">{store.opening_hours[0]}</span>
+                ) : (
+                  <span className="italic">Hours not available</span>
                 )}
               </div>
             </div>
             
-            <div className="space-y-2 text-sm">
-              {store.address && (
-                <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
-                  <MapPin className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="line-clamp-2">{store.address}</span>
-                </div>
+            {/* Action Buttons */}
+            <div className="mt-4 space-y-2">
+              {/* Call to Check Availability */}
+              {store.phone ? (
+                <a
+                  href={`tel:${store.phone}`}
+                  className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                  data-testid={`call-store-${index}`}
+                >
+                  <Phone className="w-4 h-4" />
+                  Call to Check Availability
+                </a>
+              ) : (
+                <button
+                  disabled
+                  className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-400 bg-slate-100 dark:bg-slate-700 px-4 py-2 rounded-lg cursor-not-allowed"
+                >
+                  <Phone className="w-4 h-4" />
+                  Phone Not Available
+                </button>
               )}
               
-              {store.phone && (
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <Phone className="w-4 h-4 text-blue-500" />
-                  <a href={`tel:${store.phone}`} className="hover:text-blue-600 hover:underline">{store.phone}</a>
-                </div>
-              )}
-              
-              {store.website && (
-                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <Globe className="w-4 h-4 text-purple-500" />
-                  <a href={store.website} target="_blank" rel="noopener noreferrer" className="hover:text-purple-600 hover:underline truncate">
-                    Visit Website
-                  </a>
-                </div>
-              )}
-              
-              {store.distance_meters && (
-                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
-                  <Building2 className="w-3 h-3" />
-                  <span>{(store.distance_meters / 1000).toFixed(1)} km from city center</span>
-                </div>
-              )}
-              
-              {store.opening_hours?.length > 0 && (
-                <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 text-xs">
-                  <Clock className="w-3 h-3 mt-0.5" />
-                  <span className="line-clamp-1">{store.opening_hours[0]}</span>
-                </div>
+              {/* View on Google Maps */}
+              {store.google_maps_url && (
+                <a
+                  href={store.google_maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+                  data-testid={`view-map-${index}`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  View on Google Maps
+                </a>
               )}
             </div>
-            
-            {store.google_maps_url && (
-              <a
-                href={store.google_maps_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
-                data-testid={`view-map-${index}`}
-              >
-                <MapPin className="w-4 h-4" />
-                View on Google Maps
-              </a>
-            )}
           </motion.div>
         ))}
       </div>
