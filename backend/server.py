@@ -1324,6 +1324,38 @@ out skel qt;
         logger.error(f"OpenStreetMap Overpass API error: {str(e)}")
         return []
 
+def get_osm_categories_extended(query: str) -> Dict[str, str]:
+    """Map product query to extended OpenStreetMap categories including factories, wholesale, manufacturing"""
+    query_lower = query.lower()
+    
+    # Base shop categories
+    if any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
+        return {"shop": "mobile_phone|electronics|computer", "craft": "electronics"}
+    elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
+        return {"shop": "computer|electronics", "craft": "electronics"}
+    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics", "camera", "headphone", "earphone", "speaker", "audio"]):
+        return {"shop": "electronics|hifi|camera", "craft": "electronics"}
+    elif any(word in query_lower for word in ["watch", "smartwatch"]):
+        return {"shop": "watches|jewelry", "craft": "watchmaker"}
+    elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
+        return {"shop": "doityourself|bathroom_furnishing|tiles", "craft": "carpenter"}
+    elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
+        return {"shop": "furniture", "craft": "carpenter|furniture"}
+    elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
+        return {"shop": "clothes|boutique|fashion", "craft": "tailor|dressmaker"}
+    elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal"]):
+        return {"shop": "shoes", "craft": "shoemaker"}
+    elif any(word in query_lower for word in ["jewel", "gold", "diamond", "ring", "necklace"]):
+        return {"shop": "jewelry|jewellery", "craft": "jeweller"}
+    elif any(word in query_lower for word in ["grocery", "food", "vegetable", "fruit"]):
+        return {"shop": "supermarket|greengrocer|convenience", "craft": ""}
+    elif any(word in query_lower for word in ["car", "automobile", "vehicle"]):
+        return {"shop": "car|car_parts", "craft": "car_repair"}
+    elif any(word in query_lower for word in ["bike", "bicycle", "cycle"]):
+        return {"shop": "bicycle", "craft": "bicycle"}
+    else:
+        return {"shop": "electronics|wholesale|department_store", "craft": "electronics"}
+
 def get_osm_shop_category(query: str) -> str:
     """Map product query to OpenStreetMap shop tag"""
     query_lower = query.lower()
