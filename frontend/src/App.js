@@ -2295,38 +2295,9 @@ const SearchPage = () => {
                 </TabsList>
 
                 <TabsContent value="products" className="mt-6">
-                  {/* Online Products */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
-                        <ShoppingCart className="w-5 h-5 inline mr-2 text-blue-600" />
-                        Online Marketplace ({filteredResults.length} products)
-                      </h3>
-                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        Live Prices
-                      </Badge>
-                    </div>
-                    <div className={view === "grid" ? "product-grid" : "space-y-3"} data-testid="product-grid">
-                      {filteredResults.map((product, index) => (
-                        <ProductCard 
-                          key={index} 
-                          product={product} 
-                          index={index} 
-                          allProducts={filteredResults}
-                          view={view}
-                          selectedCurrency={selectedCurrency}
-                          onFavoriteToggle={isFavorite(product) ? removeFavorite : addFavorite}
-                          isFavorite={isFavorite(product)}
-                          onCompareToggle={isInCompare(product) ? removeFromCompare : addToCompare}
-                          isInCompare={isInCompare(product)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Local Stores Preview on Products Tab */}
+                  {/* Local Stores Section - SHOWN FIRST AT TOP */}
                   {searchResults.local_stores && searchResults.local_stores.length > 0 && (
-                    <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                    <div className="mb-8 pb-8 border-b border-slate-200 dark:border-slate-700">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
                           <MapPin className="w-5 h-5 inline mr-2 text-green-600" />
@@ -2340,7 +2311,7 @@ const SearchPage = () => {
                         Visit these local stores for in-person purchase, touch & feel, and direct contact with vendors.
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {searchResults.local_stores.slice(0, 6).map((store, index) => (
+                        {searchResults.local_stores.map((store, index) => (
                           <div 
                             key={store.place_id || index}
                             className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 hover:shadow-md transition-all"
@@ -2364,6 +2335,12 @@ const SearchPage = () => {
                                   <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                     <Phone className="w-3 h-3" />
                                     {store.phone}
+                                  </p>
+                                )}
+                                {store.website && (
+                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                    <Globe className="w-3 h-3" />
+                                    <a href={store.website} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">Website</a>
                                   </p>
                                 )}
                                 {store.distance_meters && (
@@ -2392,18 +2369,37 @@ const SearchPage = () => {
                           </div>
                         ))}
                       </div>
-                      {searchResults.local_stores.length > 6 && (
-                        <div className="text-center mt-4">
-                          <button 
-                            onClick={() => document.querySelector('[data-testid="tab-local"]')?.click()}
-                            className="text-sm text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium"
-                          >
-                            View all {searchResults.local_stores.length} local stores →
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
+                  
+                  {/* Online Products - SHOWN AFTER LOCAL STORES */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+                        <ShoppingCart className="w-5 h-5 inline mr-2 text-blue-600" />
+                        Online Marketplace ({filteredResults.length} products)
+                      </h3>
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        Live Prices
+                      </Badge>
+                    </div>
+                    <div className={view === "grid" ? "product-grid" : "space-y-3"} data-testid="product-grid">
+                      {filteredResults.map((product, index) => (
+                        <ProductCard 
+                          key={index} 
+                          product={product} 
+                          index={index} 
+                          allProducts={filteredResults}
+                          view={view}
+                          selectedCurrency={selectedCurrency}
+                          onFavoriteToggle={isFavorite(product) ? removeFavorite : addFavorite}
+                          isFavorite={isFavorite(product)}
+                          onCompareToggle={isInCompare(product) ? removeFromCompare : addToCompare}
+                          isInCompare={isInCompare(product)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="local" className="mt-6">
