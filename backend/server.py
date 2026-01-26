@@ -911,6 +911,99 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         "is_real_vendor": True
     }
 
+# ================== DIRECT VENDOR LINKS ==================
+def get_direct_vendor_link(source_name: str, product_name: str) -> str:
+    """
+    Generate direct search link to vendor's website instead of Google redirect.
+    Maps vendor names to their actual website search URLs.
+    """
+    source_lower = source_name.lower().strip()
+    encoded_product = product_name.replace(" ", "+")
+    
+    # Comprehensive vendor URL mapping
+    vendor_urls = {
+        # Indian E-commerce
+        "amazon": f"https://www.amazon.in/s?k={encoded_product}",
+        "amazon.in": f"https://www.amazon.in/s?k={encoded_product}",
+        "amazon india": f"https://www.amazon.in/s?k={encoded_product}",
+        "flipkart": f"https://www.flipkart.com/search?q={encoded_product}",
+        "myntra": f"https://www.myntra.com/{encoded_product}",
+        "ajio": f"https://www.ajio.com/search/?text={encoded_product}",
+        "tata cliq": f"https://www.tatacliq.com/search/?searchCategory=all&text={encoded_product}",
+        "snapdeal": f"https://www.snapdeal.com/search?keyword={encoded_product}",
+        "meesho": f"https://www.meesho.com/search?q={encoded_product}",
+        "jiomart": f"https://www.jiomart.com/search/{encoded_product}",
+        "jiomart electronics": f"https://www.jiomart.com/search/{encoded_product}",
+        "reliance digital": f"https://www.reliancedigital.in/search?q={encoded_product}",
+        "croma": f"https://www.croma.com/searchB?q={encoded_product}",
+        "vijay sales": f"https://www.vijaysales.com/search/{encoded_product}",
+        "poorvika": f"https://www.poorvikamobile.com/catalogsearch/result/?q={encoded_product}",
+        "sangeetha": f"https://www.sangeethamobiles.com/catalogsearch/result/?q={encoded_product}",
+        "sangeetha mobiles": f"https://www.sangeethamobiles.com/catalogsearch/result/?q={encoded_product}",
+        
+        # Mobile/Electronics specific India
+        "cashify": f"https://www.cashify.in/buy-refurbished-mobiles?q={encoded_product}",
+        "2gud": f"https://www.2gud.com/search?q={encoded_product}",
+        "iplanet": f"https://www.iplanet.in/catalogsearch/result/?q={encoded_product}",
+        "imagine": f"https://www.imagineonline.store/catalogsearch/result/?q={encoded_product}",
+        "imagine apple": f"https://www.imagineonline.store/catalogsearch/result/?q={encoded_product}",
+        "imagine apple premium reseller": f"https://www.imagineonline.store/catalogsearch/result/?q={encoded_product}",
+        "apple store": f"https://www.apple.com/in/shop/buy-iphone",
+        
+        # B2B India
+        "indiamart": f"https://www.indiamart.com/proddetail/{encoded_product}",
+        "tradeindia": f"https://www.tradeindia.com/search.html?search_query={encoded_product}",
+        "exportersindia": f"https://www.exportersindia.com/search.htm?search={encoded_product}",
+        
+        # US E-commerce
+        "amazon.com": f"https://www.amazon.com/s?k={encoded_product}",
+        "amazon us": f"https://www.amazon.com/s?k={encoded_product}",
+        "walmart": f"https://www.walmart.com/search?q={encoded_product}",
+        "target": f"https://www.target.com/s?searchTerm={encoded_product}",
+        "best buy": f"https://www.bestbuy.com/site/searchpage.jsp?st={encoded_product}",
+        "bestbuy": f"https://www.bestbuy.com/site/searchpage.jsp?st={encoded_product}",
+        "newegg": f"https://www.newegg.com/p/pl?d={encoded_product}",
+        "ebay": f"https://www.ebay.com/sch/i.html?_nkw={encoded_product}",
+        "costco": f"https://www.costco.com/CatalogSearch?keyword={encoded_product}",
+        
+        # Home Improvement
+        "home depot": f"https://www.homedepot.com/s/{encoded_product}",
+        "homedepot": f"https://www.homedepot.com/s/{encoded_product}",
+        "lowe's": f"https://www.lowes.com/search?searchTerm={encoded_product}",
+        "lowes": f"https://www.lowes.com/search?searchTerm={encoded_product}",
+        "ace hardware": f"https://www.acehardware.com/search?query={encoded_product}",
+        "menards": f"https://www.menards.com/main/search.html?search={encoded_product}",
+        
+        # UK E-commerce
+        "amazon.co.uk": f"https://www.amazon.co.uk/s?k={encoded_product}",
+        "amazon uk": f"https://www.amazon.co.uk/s?k={encoded_product}",
+        "argos": f"https://www.argos.co.uk/search/{encoded_product}",
+        "currys": f"https://www.currys.co.uk/search?q={encoded_product}",
+        "john lewis": f"https://www.johnlewis.com/search?search-term={encoded_product}",
+        
+        # UAE E-commerce
+        "noon": f"https://www.noon.com/uae-en/search/?q={encoded_product}",
+        "amazon.ae": f"https://www.amazon.ae/s?k={encoded_product}",
+        "sharaf dg": f"https://uae.sharafdg.com/search/?q={encoded_product}",
+        "lulu": f"https://www.luluhypermarket.com/en-ae/search?q={encoded_product}",
+        
+        # Global
+        "alibaba": f"https://www.alibaba.com/trade/search?SearchText={encoded_product}",
+        "aliexpress": f"https://www.aliexpress.com/wholesale?SearchText={encoded_product}",
+    }
+    
+    # Try exact match first
+    if source_lower in vendor_urls:
+        return vendor_urls[source_lower]
+    
+    # Try partial match
+    for vendor_key, url in vendor_urls.items():
+        if vendor_key in source_lower or source_lower in vendor_key:
+            return url
+    
+    # Fallback: Google search for the vendor + product
+    return f"https://www.google.com/search?q={encoded_product}+{source_name.replace(' ', '+')}"
+
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
     """
