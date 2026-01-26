@@ -2056,9 +2056,9 @@ async def search_products(request: SearchRequest):
         
         logger.info(f"Location: {location_data}, Currency: {currency_info}")
         
-        # Run both searches in parallel: SerpAPI for online prices + Foursquare for local stores
+        # Run both searches in parallel: SerpAPI for online prices + OpenStreetMap for local stores
         serpapi_task = search_with_serpapi(query, location_data["country"], request.max_results, location_data.get("city", ""))
-        places_task = search_local_stores_with_places_api(query, location_data.get("city", ""), 10)
+        places_task = search_local_stores_with_places_api(query, location_data.get("city", ""), 30)  # Get up to 30 local stores
         
         real_results, local_stores = await asyncio.gather(serpapi_task, places_task)
         
