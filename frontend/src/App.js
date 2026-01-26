@@ -1644,6 +1644,16 @@ const LocalStoresSection = ({ localStores, city }) => {
                 )}
               </div>
               
+              {/* Email */}
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <Mail className="w-4 h-4 text-orange-500" />
+                {store.email ? (
+                  <a href={`mailto:${store.email}`} className="hover:text-orange-600 hover:underline truncate">{store.email}</a>
+                ) : (
+                  <span className="text-slate-400 italic">Email not available</span>
+                )}
+              </div>
+              
               {/* Website */}
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <Globe className="w-4 h-4 text-purple-500" />
