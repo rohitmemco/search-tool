@@ -1162,15 +1162,33 @@ out body {max_results};'''
         
         logger.info(f"Overpass query for area '{osm_area}' with shop regex: {shop_regex}")
         
+        # List of Overpass API servers for fallback
+        overpass_servers = [
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+        ]
+        
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://overpass-api.de/api/interpreter",
-                data=overpass_query,
-                timeout=40.0
-            )
+            response = None
+            for server in overpass_servers:
+                try:
+                    response = await client.post(
+                        server,
+                        data=overpass_query,
+                        timeout=30.0
+                    )
+                    if response.status_code == 200:
+                        logger.info(f"Overpass API success from {server}")
+                        break
+                    else:
+                        logger.warning(f"Overpass API {server} returned {response.status_code}, trying next...")
+                except Exception as e:
+                    logger.warning(f"Overpass API {server} failed: {str(e)}, trying next...")
+                    continue
             
-            if response.status_code != 200:
-                logger.error(f"Overpass API error: {response.status_code}")
+            if not response or response.status_code != 200:
+                logger.error(f"All Overpass API servers failed")
                 return []
             
             data = response.json()
