@@ -1089,10 +1089,10 @@ def get_store_type_from_query(query: str) -> str:
     else:
         return "store"
 
-async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 10) -> List[Dict]:
+async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 15) -> List[Dict]:
     """
-    Search for LOCAL stores using OpenStreetMap Overpass API (FREE, No API Key Required).
-    Returns actual store listings with real names and addresses from OSM crowdsourced data.
+    Search for LOCAL businesses using OpenStreetMap Overpass API (FREE, No API Key Required).
+    Returns stores, factory outlets, manufacturing units, wholesalers, and retail shops.
     """
     try:
         # Get city coordinates from query or provided city
@@ -1106,8 +1106,8 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
             logger.info("No city found in query, skipping local store search")
             return []
         
-        # Determine OSM shop category from query
-        shop_category = get_osm_shop_category(query)
+        # Determine OSM categories from query
+        shop_categories = get_osm_categories_extended(query)
         city_name = city_info.get("name", city).title()
         
         # Map common city names to OSM area names
@@ -1142,19 +1142,40 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         
         osm_area = osm_area_names.get(city_name.lower(), city_name)
         
-        logger.info(f"OpenStreetMap search: shop='{shop_category}' in area '{osm_area}'")
+        logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
         
-        # Build Overpass API query
+        # Build comprehensive Overpass API query including factories, manufacturing, wholesale, retail
         overpass_query = f'''
-[out:json][timeout:25];
+[out:json][timeout:30];
 area["name"="{osm_area}"]->.searchArea;
 (
-  node["shop"="{shop_category}"](area.searchArea);
-  way["shop"="{shop_category}"](area.searchArea);
-  node["shop"~"electronics|mobile_phone|computer"](area.searchArea);
-  way["shop"~"electronics|mobile_phone|computer"](area.searchArea);
+  // Retail Shops
+  node["shop"~"{shop_categories['shop']}"](area.searchArea);
+  way["shop"~"{shop_categories['shop']}"](area.searchArea);
+  
+  // Factory Outlets & Manufacturing Units
+  node["industrial"~"factory|warehouse|manufacturing"](area.searchArea);
+  way["industrial"~"factory|warehouse|manufacturing"](area.searchArea);
+  node["man_made"~"works|factory"](area.searchArea);
+  way["man_made"~"works|factory"](area.searchArea);
+  node["landuse"="industrial"]["name"](area.searchArea);
+  way["landuse"="industrial"]["name"](area.searchArea);
+  
+  // Wholesale & Trade
+  node["shop"="wholesale"](area.searchArea);
+  way["shop"="wholesale"](area.searchArea);
+  node["trade"](area.searchArea);
+  way["trade"](area.searchArea);
+  
+  // Office/Company locations (brand offices, showrooms)
+  node["office"~"company|it"](area.searchArea);
+  way["office"~"company|it"](area.searchArea);
+  
+  // Craft/Manufacturing workshops
+  node["craft"~"{shop_categories.get('craft', 'electronics')}"](area.searchArea);
+  way["craft"~"{shop_categories.get('craft', 'electronics')}"](area.searchArea);
 );
-out body {max_results};
+out body {max_results * 2};
 >;
 out skel qt;
 '''
@@ -1163,7 +1184,7 @@ out skel qt;
             response = await client.post(
                 "https://overpass-api.de/api/interpreter",
                 data=overpass_query,
-                timeout=30.0
+                timeout=35.0
             )
             
             if response.status_code != 200:
