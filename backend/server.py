@@ -1322,11 +1322,13 @@ def generate_analysis(results: List[Dict], product_data: Dict, location_data: Di
     max_price = max(prices)
     avg_price = sum(prices) / len(prices)
     
-    # Find best value (good rating near average price)
+    # Find best value (good rating near average price) - handle None ratings
     best_value = None
     for r in results:
-        if r["rating"] >= 4.0 and abs(r["price"] - avg_price) < avg_price * 0.3:
-            if not best_value or r["rating"] > best_value["rating"]:
+        rating = r.get("rating") or 0
+        price = r.get("price") or 0
+        if rating >= 4.0 and price > 0 and abs(price - avg_price) < avg_price * 0.3:
+            if not best_value or rating > (best_value.get("rating") or 0):
                 best_value = r
     
     symbol = currency_info["symbol"]
