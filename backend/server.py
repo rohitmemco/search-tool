@@ -916,7 +916,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
     """
     Search Google Shopping using SerpAPI for real product data.
     Returns actual prices and working product links from real marketplaces.
-    Uses city parameter to generate location-accurate vendor details.
+    Only returns REAL data from Google Shopping - no generated/fake data.
     """
     if not SERPAPI_API_KEY:
         logger.warning("SerpAPI key not configured, falling back to mock data")
@@ -957,23 +957,15 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
         products = []
         currency_symbol = "₹" if params["currency"] == "INR" else "$" if params["currency"] == "USD" else params["currency"]
         
-        # Location data for vendor generation - use city from search query if available
-        location_data = {
-            "city": city.lower() if city else params["country"],
-            "country": params["country"]
-        }
-        
-        logger.info(f"Vendor location data: {location_data}")
-        
         # Parse inline shopping results (featured products at top)
         if "inline_shopping_results" in api_response:
             for idx, item in enumerate(api_response["inline_shopping_results"]):
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
                     source_name = item.get("source", "Google Shopping")
-                    vendor_details = generate_vendor_for_real_source(source_name, location_data, price)
                     
-                    products.append({
+                    # Only include REAL data from SerpAPI - no fake/generated data
+                    product_data = {
                         "name": item.get("title", "Unknown Product"),
                         "price": float(price),
                         "currency_symbol": currency_symbol,
@@ -981,17 +973,23 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "source": source_name,
                         "source_url": item.get("link", ""),
                         "description": item.get("snippet", ""),
-                        "rating": item.get("rating", 0) or round(random.uniform(3.5, 5.0), 1),
+                        "rating": item.get("rating") if item.get("rating") else None,
                         "availability": "In Stock",
                         "unit": "per piece",
                         "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                         "image": item.get("thumbnail", ""),
                         "location": params["location"],
-                        "review_count": item.get("reviews", 0),
+                        "review_count": item.get("reviews") if item.get("reviews") else None,
                         "position": idx + 1,
                         "is_real_data": True,
-                        "vendor": vendor_details
-                    })
+                        # Real vendor info from SerpAPI (only what's actually available)
+                        "vendor": {
+                            "vendor_name": source_name,
+                            "is_real_data": True,
+                            "data_source": "Google Shopping"
+                        }
+                    }
+                    products.append(product_data)
         
         # Parse main shopping results
         if "shopping_results" in api_response:
@@ -999,9 +997,9 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                 price = item.get("extracted_price", 0)
                 if price and price > 0:
                     source_name = item.get("source", "Google Shopping")
-                    vendor_details = generate_vendor_for_real_source(source_name, location_data, price)
                     
-                    products.append({
+                    # Only include REAL data from SerpAPI - no fake/generated data
+                    product_data = {
                         "name": item.get("title", "Unknown Product"),
                         "price": float(price),
                         "currency_symbol": currency_symbol,
@@ -1009,17 +1007,23 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "source": source_name,
                         "source_url": item.get("product_link", item.get("link", "")),
                         "description": item.get("snippet", ""),
-                        "rating": item.get("rating", 0) or round(random.uniform(3.5, 5.0), 1),
+                        "rating": item.get("rating") if item.get("rating") else None,
                         "availability": "In Stock" if not item.get("second_hand_condition") else "Used",
                         "unit": "per piece",
                         "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                         "image": item.get("thumbnail", ""),
                         "location": params["location"],
-                        "review_count": item.get("reviews", 0),
+                        "review_count": item.get("reviews") if item.get("reviews") else None,
                         "position": len(products) + 1,
                         "is_real_data": True,
-                        "vendor": vendor_details
-                    })
+                        # Real vendor info from SerpAPI (only what's actually available)
+                        "vendor": {
+                            "vendor_name": source_name,
+                            "is_real_data": True,
+                            "data_source": "Google Shopping"
+                        }
+                    }
+                    products.append(product_data)
         
         logger.info(f"SerpAPI returned {len(products)} real products")
         return products[:max_results]
