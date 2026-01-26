@@ -1267,7 +1267,7 @@ def get_store_type_from_query(query: str) -> str:
     else:
         return "store"
 
-async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 15) -> List[Dict]:
+async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 30) -> List[Dict]:
     """
     Search for LOCAL businesses using OpenStreetMap Overpass API (FREE, No API Key Required).
     Returns stores, factory outlets, manufacturing units, wholesalers, and retail shops.
