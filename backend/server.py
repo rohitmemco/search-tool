@@ -1213,6 +1213,8 @@ out skel qt;
                     address_parts.append(tags.get("addr:street"))
                 if tags.get("addr:suburb") or tags.get("addr:neighbourhood"):
                     address_parts.append(tags.get("addr:suburb") or tags.get("addr:neighbourhood"))
+                if tags.get("addr:city"):
+                    address_parts.append(tags.get("addr:city"))
                 
                 full_address = ", ".join(address_parts) if address_parts else f"Near {osm_area}"
                 
@@ -1233,6 +1235,57 @@ out skel qt;
                     c = 2 * math.asin(math.sqrt(a))
                     distance_meters = int(6371000 * c)  # Earth radius in meters
                 
+                # Determine business type from OSM tags
+                business_type = "Retail Shop"
+                business_icon = "🏪"
+                
+                if tags.get("industrial") or tags.get("man_made") in ["works", "factory"]:
+                    if "warehouse" in str(tags.get("industrial", "")):
+                        business_type = "Warehouse / Distribution"
+                        business_icon = "🏭"
+                    else:
+                        business_type = "Factory / Manufacturing Unit"
+                        business_icon = "🏭"
+                elif tags.get("landuse") == "industrial":
+                    business_type = "Industrial Zone"
+                    business_icon = "🏭"
+                elif tags.get("shop") == "wholesale":
+                    business_type = "Wholesale Supplier"
+                    business_icon = "📦"
+                elif tags.get("trade"):
+                    business_type = "Trade / B2B"
+                    business_icon = "🤝"
+                elif tags.get("office"):
+                    business_type = "Corporate Office / Showroom"
+                    business_icon = "🏢"
+                elif tags.get("craft"):
+                    business_type = "Manufacturing Workshop"
+                    business_icon = "🔧"
+                elif tags.get("shop") == "mall" or "outlet" in name.lower():
+                    business_type = "Factory Outlet"
+                    business_icon = "🏬"
+                elif tags.get("brand"):
+                    business_type = "Brand Authorized Store"
+                    business_icon = "✅"
+                else:
+                    business_type = "Retail Shop"
+                    business_icon = "🏪"
+                
+                # Build categories list
+                categories = []
+                if tags.get("shop"):
+                    categories.append(tags.get("shop"))
+                if tags.get("brand"):
+                    categories.append(tags.get("brand"))
+                if tags.get("industrial"):
+                    categories.append(tags.get("industrial"))
+                if tags.get("trade"):
+                    categories.append(tags.get("trade"))
+                if tags.get("craft"):
+                    categories.append(tags.get("craft"))
+                if not categories:
+                    categories = [business_type]
+                
                 store = {
                     "place_id": str(element.get("id", "")),
                     "name": name,
@@ -1241,12 +1294,15 @@ out skel qt;
                     "region": tags.get("addr:state", city_info.get("country", "").title()),
                     "postcode": tags.get("addr:postcode", ""),
                     "phone": tags.get("phone") or tags.get("contact:phone", ""),
+                    "email": tags.get("email") or tags.get("contact:email", ""),
                     "website": tags.get("website") or tags.get("contact:website", ""),
                     "rating": None,  # OSM doesn't have ratings
                     "review_count": 0,
                     "is_open_now": None,  # Would need opening_hours parsing
                     "opening_hours": [tags.get("opening_hours")] if tags.get("opening_hours") else [],
-                    "categories": [tags.get("shop", "store"), tags.get("brand", "")] if tags.get("brand") else [tags.get("shop", "store")],
+                    "categories": categories,
+                    "business_type": business_type,
+                    "business_icon": business_icon,
                     "distance_meters": distance_meters,
                     "price_level": None,
                     "city": osm_area,
