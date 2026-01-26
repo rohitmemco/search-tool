@@ -1353,21 +1353,17 @@ out body {max_results * 2};'''
             
             local_stores = []
             seen_names = set()  # Avoid duplicates
+            relevant_stores = []  # Stores matching keywords (priority)
+            other_stores = []  # Other matching stores
             
-            # Keywords to EXCLUDE - these are not relevant stores
-            exclude_keywords = [
-                "fruit", "vegetable", "flower", "fish", "meat", "chicken", "mutton",
-                "market jn", "market junction", "bus stop", "bus stand", "railway",
+            # Keywords to ALWAYS EXCLUDE - these are never relevant
+            always_exclude = [
+                "fruit market", "vegetable market", "flower market", "fish market", 
+                "meat", "chicken", "mutton", "bus stop", "bus stand", "railway",
                 "restaurant", "hotel", "cafe", "food court", "biryani", "dosa",
                 "temple", "church", "mosque", "school", "college", "hospital",
-                "bank", "atm", "petrol", "gas station", "parking",
-                "boutique", "saree", "textile", "garment", "fashion",  # Unless searching for clothes
-                "jewel", "gold",  # Unless searching for jewelry
-                "mobile", "phone",  # Unless searching for phones
+                "bank", "atm", "petrol pump", "gas station", "parking"
             ]
-            
-            # Get the search category to allow relevant stores
-            search_category = shop_regex.lower()
             
             for element in data.get("elements", []):
                 tags = element.get("tags", {})
@@ -1380,21 +1376,24 @@ out body {max_results * 2};'''
                 name_lower = name.lower()
                 shop_type = tags.get("shop", "").lower()
                 
-                # Skip stores that don't match the search category
+                # Skip stores in always-exclude list
                 should_skip = False
-                for exclude in exclude_keywords:
+                for exclude in always_exclude:
                     if exclude in name_lower:
-                        # Allow if it matches the search category
-                        if exclude in search_category or shop_type in search_category:
-                            continue
                         should_skip = True
                         break
                 
                 if should_skip:
-                    logger.debug(f"Skipping irrelevant store: {name}")
                     continue
                     
                 seen_names.add(name)
+                
+                # Check if store name contains any product keyword (high relevance)
+                is_relevant = False
+                for keyword in product_keywords:
+                    if keyword in name_lower or keyword in shop_type:
+                        is_relevant = True
+                        break
                 
                 # Build address from OSM tags
                 address_parts = []
