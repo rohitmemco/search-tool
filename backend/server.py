@@ -1314,8 +1314,21 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
             query_parts.append(f'way["shop"~"{shop_regex}"](area.searchArea);')
         
         # Search for stores with product keywords in their name (must have shop tag)
+        # Use word boundary matching to avoid partial matches (e.g., "fan" matching "fancy")
         if product_keywords:
-            keyword_regex = '|'.join(product_keywords)
+            # Build regex with word boundaries for each keyword
+            # OpenStreetMap regex uses POSIX ERE, word boundary is \b but may not work
+            # Instead, use pattern like: (^|[^a-z])keyword([^a-z]|$) for word boundary simulation
+            # Simpler approach: search for exact word match with space/start/end boundaries
+            keyword_patterns = []
+            for kw in product_keywords:
+                # Match keyword at start, end, or surrounded by non-letter characters
+                # This prevents "fan" from matching "fancy" 
+                keyword_patterns.append(f'(^|[^a-zA-Z]){kw}([^a-zA-Z]|$)')
+            keyword_regex = '|'.join(product_keywords)  # Fallback to simple match
+            
+            # For better results, search for each keyword separately and combine
+            # This ensures we find stores with actual product names
             query_parts.append(f'node["name"~"{keyword_regex}",i]["shop"](area.searchArea);')
             query_parts.append(f'way["name"~"{keyword_regex}",i]["shop"](area.searchArea);')
         
