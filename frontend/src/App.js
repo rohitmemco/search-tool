@@ -1769,7 +1769,7 @@ const SearchPage = () => {
   const filteredResults = searchResults?.results?.filter(r => {
     const price = r.price;
     const meetsPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1];
-    const meetsRating = r.rating >= filters.minRating;
+    const meetsRating = (r.rating || 0) >= filters.minRating;
     const meetsAvailability = filters.availability.includes(r.availability);
     
     // Advanced filters
