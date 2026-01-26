@@ -1498,16 +1498,25 @@ out body {max_results * 2};'''
                     "city": osm_area,
                     "country": city_info.get("country", ""),
                     "is_local_store": True,
+                    "is_relevant": is_relevant,  # Mark if matches product keywords
                     "data_source": "OpenStreetMap",
                     "google_maps_url": f"https://www.google.com/maps/search/?api=1&query={name.replace(' ', '+')}+{osm_area.replace(' ', '+')}" if lat and lon else f"https://www.google.com/maps/search/?api=1&query={name.replace(' ', '+')}",
                     "coordinates": {"lat": lat, "lon": lon} if lat and lon else None
                 }
-                local_stores.append(store)
                 
-                if len(local_stores) >= max_results:
-                    break
+                # Add to appropriate list based on relevance
+                if is_relevant:
+                    relevant_stores.append(store)
+                else:
+                    other_stores.append(store)
             
-            logger.info(f"OpenStreetMap returned {len(local_stores)} local stores in {osm_area}")
+            # Combine: relevant stores first, then other stores
+            local_stores = relevant_stores + other_stores
+            
+            # Limit to max_results
+            local_stores = local_stores[:max_results]
+            
+            logger.info(f"OpenStreetMap returned {len(local_stores)} local stores in {osm_area} ({len(relevant_stores)} highly relevant)")
             return local_stores
             
     except Exception as e:
