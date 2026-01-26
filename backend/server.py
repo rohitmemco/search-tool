@@ -893,7 +893,6 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
     # Generate address
     building_num = random.randint(1, 500)
     full_address = f"#{building_num}, {street}, {city_info['name']}, {city_info['state']} - {postal_code}"
-    full_address = f"#{building_num}, {street}, {city_info['name']}, {city_info['state']} - {postal_code}"
     
     return {
         "vendor_name": source_name,
@@ -901,7 +900,7 @@ def generate_vendor_for_real_source(source_name: str, location_data: Dict, price
         "vendor_phone": phone,
         "vendor_address": full_address,
         "vendor_city": city_info["name"],
-        "vendor_country": country.upper(),
+        "vendor_country": actual_country.upper(),
         "vendor_type": vendor_type,
         "business_type": business_type,
         "years_in_business": years_in_business,
