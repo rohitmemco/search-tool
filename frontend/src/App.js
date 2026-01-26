@@ -1579,8 +1579,22 @@ const LocalStoresSection = ({ localStores, city }) => {
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{store.name || "Unknown Store"}</h4>
-                <div className="flex flex-wrap gap-1 mt-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">{store.business_icon || "🏪"}</span>
+                  <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{store.name || "Unknown Store"}</h4>
+                </div>
+                {/* Business Type Badge */}
+                <Badge className={`text-xs mb-2 ${
+                  store.business_type?.includes("Factory") ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" :
+                  store.business_type?.includes("Wholesale") ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" :
+                  store.business_type?.includes("Manufacturing") ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400" :
+                  store.business_type?.includes("Corporate") ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" :
+                  store.business_type?.includes("Outlet") ? "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400" :
+                  "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                }`}>
+                  {store.business_type || "Retail Shop"}
+                </Badge>
+                <div className="flex flex-wrap gap-1">
                   {store.categories?.filter(c => c).length > 0 ? (
                     store.categories.filter(c => c).slice(0, 2).map((cat, idx) => (
                       <Badge key={idx} variant="outline" className="text-xs">{cat}</Badge>
@@ -1608,7 +1622,7 @@ const LocalStoresSection = ({ localStores, city }) => {
             </div>
             
             <div className="space-y-2 text-sm border-t border-slate-100 dark:border-slate-700 pt-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Store Details</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Business Details</p>
               
               {/* Address */}
               <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
