@@ -1543,6 +1543,122 @@ const DataSourcesSection = ({ dataSources }) => {
 };
 
 // Vendors Section
+// Local Stores Section Component - Shows physical stores from OpenStreetMap
+const LocalStoresSection = ({ localStores, city }) => {
+  if (!localStores || localStores.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+        <MapPin className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <p>No local stores found for this location</p>
+        <p className="text-sm mt-2">Try adding a city name to your search (e.g., "laptops in Bangalore")</p>
+      </div>
+    );
+  }
+  
+  return (
+    <div data-testid="local-stores-section">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-['Manrope']">
+          <MapPin className="w-5 h-5 inline mr-2 text-green-600" />
+          Local Stores {city && `in ${city}`} ({localStores.length})
+        </h3>
+        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          ✓ Real Data from OpenStreetMap
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {localStores.map((store, index) => (
+          <motion.div 
+            key={store.place_id || index} 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ delay: index * 0.05 }} 
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:shadow-lg hover:border-green-200 dark:hover:border-green-800 transition-all" 
+            data-testid={`local-store-card-${index}`}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{store.name}</h4>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {store.categories?.filter(c => c).slice(0, 2).map((cat, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">{cat}</Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                {store.is_open_now !== null && (
+                  <Badge className={store.is_open_now ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"}>
+                    {store.is_open_now ? "Open Now" : "Closed"}
+                  </Badge>
+                )}
+                {store.rating && (
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    <span className="text-sm font-medium">{store.rating}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              {store.address && (
+                <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
+                  <MapPin className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span className="line-clamp-2">{store.address}</span>
+                </div>
+              )}
+              
+              {store.phone && (
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <Phone className="w-4 h-4 text-blue-500" />
+                  <a href={`tel:${store.phone}`} className="hover:text-blue-600 hover:underline">{store.phone}</a>
+                </div>
+              )}
+              
+              {store.website && (
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <Globe className="w-4 h-4 text-purple-500" />
+                  <a href={store.website} target="_blank" rel="noopener noreferrer" className="hover:text-purple-600 hover:underline truncate">
+                    Visit Website
+                  </a>
+                </div>
+              )}
+              
+              {store.distance_meters && (
+                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                  <Building2 className="w-3 h-3" />
+                  <span>{(store.distance_meters / 1000).toFixed(1)} km from city center</span>
+                </div>
+              )}
+              
+              {store.opening_hours?.length > 0 && (
+                <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                  <Clock className="w-3 h-3 mt-0.5" />
+                  <span className="line-clamp-1">{store.opening_hours[0]}</span>
+                </div>
+              )}
+            </div>
+            
+            {store.google_maps_url && (
+              <a
+                href={store.google_maps_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+                data-testid={`view-map-${index}`}
+              >
+                <MapPin className="w-4 h-4" />
+                View on Google Maps
+              </a>
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const VendorsSection = ({ results }) => {
   // Group products by vendor name (since we only have vendor_name now)
   const vendorsMap = new Map();
