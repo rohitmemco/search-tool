@@ -1597,6 +1597,9 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     if product_keywords:
         return {"shop": "", "keywords": product_keywords}
     
+    return {"shop": "", "keywords": []}
+        return {"shop": "", "keywords": product_keywords}
+    
     # If nothing found, return empty
     return {"shop": "", "keywords": []}
 
