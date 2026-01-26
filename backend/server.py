@@ -1393,7 +1393,7 @@ async def search_products(request: SearchRequest):
         logger.info(f"Location: {location_data}, Currency: {currency_info}")
         
         # Try to get REAL data from SerpAPI first
-        real_results = await search_with_serpapi(query, location_data["country"], request.max_results)
+        real_results = await search_with_serpapi(query, location_data["country"], request.max_results, location_data.get("city", ""))
         
         if real_results and len(real_results) > 0:
             # We have real data from Google Shopping!
