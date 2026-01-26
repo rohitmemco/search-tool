@@ -1598,10 +1598,6 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
         return {"shop": "", "keywords": product_keywords}
     
     return {"shop": "", "keywords": []}
-        return {"shop": "", "keywords": product_keywords}
-    
-    # If nothing found, return empty
-    return {"shop": "", "keywords": []}
 
 def get_osm_shop_category(query: str) -> str:
     """Map product query to OpenStreetMap shop tag"""
