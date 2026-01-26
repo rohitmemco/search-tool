@@ -13,6 +13,7 @@ import random
 from datetime import datetime, timezone
 import asyncio
 from serpapi import GoogleSearch
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -24,6 +25,9 @@ db = client[os.environ['DB_NAME']]
 
 # SerpAPI configuration
 SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
+
+# Google Places API configuration
+GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
 
 # Create the main app without a prefix
 app = FastAPI()
