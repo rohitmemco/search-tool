@@ -1477,8 +1477,16 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     """Map product query to extended OpenStreetMap categories including factories, wholesale, manufacturing"""
     query_lower = query.lower()
     
-    # Base shop categories
-    if any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
+    # Base shop categories - order matters, more specific first
+    if any(word in query_lower for word in ["tap", "faucet", "pipe", "plumbing", "valve", "fitting", "sanitary"]):
+        return {"shop": "doityourself|hardware|bathroom_furnishing|plumber", "craft": "plumber"}
+    elif any(word in query_lower for word in ["brick", "cement", "sand", "concrete", "building material", "construction"]):
+        return {"shop": "doityourself|hardware|building_materials", "craft": "builder"}
+    elif any(word in query_lower for word in ["paint", "color", "wall", "coating"]):
+        return {"shop": "doityourself|paint|hardware", "craft": "painter"}
+    elif any(word in query_lower for word in ["wire", "cable", "electrical", "switch", "socket", "mcb"]):
+        return {"shop": "doityourself|electrical|hardware", "craft": "electrician"}
+    elif any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
         return {"shop": "mobile_phone|electronics|computer", "craft": "electronics"}
     elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
         return {"shop": "computer|electronics", "craft": "electronics"}
@@ -1487,7 +1495,7 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     elif any(word in query_lower for word in ["watch", "smartwatch"]):
         return {"shop": "watches|jewelry", "craft": "watchmaker"}
     elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
-        return {"shop": "doityourself|bathroom_furnishing|tiles", "craft": "carpenter"}
+        return {"shop": "doityourself|bathroom_furnishing|tiles|hardware", "craft": "carpenter"}
     elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
         return {"shop": "furniture", "craft": "carpenter|furniture"}
     elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
@@ -1502,8 +1510,10 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
         return {"shop": "car|car_parts", "craft": "car_repair"}
     elif any(word in query_lower for word in ["bike", "bicycle", "cycle"]):
         return {"shop": "bicycle", "craft": "bicycle"}
+    elif any(word in query_lower for word in ["tool", "hardware", "screw", "nail", "drill"]):
+        return {"shop": "doityourself|hardware|tools", "craft": ""}
     else:
-        return {"shop": "electronics|wholesale|department_store", "craft": "electronics"}
+        return {"shop": "doityourself|hardware|wholesale|department_store", "craft": ""}
 
 def get_osm_shop_category(query: str) -> str:
     """Map product query to OpenStreetMap shop tag"""
