@@ -1414,20 +1414,20 @@ out body {max_results * 2};'''
                     
                 seen_names.add(name)
                 
-                # Check if store name contains any product keyword (high relevance)
-                # Use word boundary matching to avoid false positives like "textiles" matching "tiles"
+                # Check if store name contains any product keyword as a WHOLE WORD (high relevance)
+                # Use word boundary matching to avoid false positives like "fan" matching "fancy"
                 is_relevant = False
                 for keyword in product_keywords:
                     # Check if keyword appears as a whole word in the name or shop type
-                    # This prevents "tiles" from matching "textiles"
                     pattern = r'\b' + re.escape(keyword) + r'\b'
                     if re.search(pattern, name_lower) or re.search(pattern, shop_type):
                         is_relevant = True
                         break
-                    # Also check if shop_type exactly matches a mapped category
-                    if keyword in shop_type.split('|'):
-                        is_relevant = True
-                        break
+                
+                # SKIP stores that don't have product keywords as whole words
+                # This is the key fix - only include stores with actual product/brand name matches
+                if not is_relevant:
+                    continue
                 
                 # Build address from OSM tags
                 address_parts = []
