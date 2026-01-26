@@ -1770,12 +1770,27 @@ const VendorsSection = ({ results }) => {
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-['Manrope']">
           <Users className="w-5 h-5 inline mr-2 text-blue-600" />
-          Sellers ({vendors.length})
+          Online Sellers ({vendors.length})
         </h3>
-        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-          ✓ Live Data from Google Shopping
+        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          Online Marketplace Data
         </Badge>
       </div>
+      
+      {/* Info banner about contact details */}
+      <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Online Vendors - Limited Contact Info</p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              These are online marketplace sellers. For direct contact details (phone, address, email), 
+              check the <strong>"Local Stores"</strong> tab which shows physical stores in your searched location.
+            </p>
+          </div>
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {vendors.map((vendor, index) => (
           <motion.div 
@@ -1789,11 +1804,9 @@ const VendorsSection = ({ results }) => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h4 className="font-semibold text-slate-800 dark:text-white text-lg">{vendor.vendor_name}</h4>
-                {vendor.is_real_data && (
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 mt-1">
-                    ✓ Verified Seller
-                  </Badge>
-                )}
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 mt-1">
+                  Online Seller
+                </Badge>
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-500 dark:text-slate-400">From</p>
@@ -1803,7 +1816,7 @@ const VendorsSection = ({ results }) => {
             
             {/* Vendor Details Section */}
             <div className="space-y-2 text-sm mb-4 border-t border-slate-100 dark:border-slate-700 pt-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Vendor Details</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">Available Information</p>
               
               {/* Website */}
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
