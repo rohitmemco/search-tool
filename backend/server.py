@@ -1091,11 +1091,11 @@ def get_store_type_from_query(query: str) -> str:
 
 async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 10) -> List[Dict]:
     """
-    Search for LOCAL stores using Google Places API.
+    Search for LOCAL stores using Foursquare Places API (FREE).
     Returns actual store listings with real addresses, phone numbers, and websites.
     """
-    if not GOOGLE_PLACES_API_KEY:
-        logger.warning("Google Places API key not configured")
+    if not FOURSQUARE_API_KEY:
+        logger.warning("Foursquare API key not configured")
         return []
     
     try:
@@ -1110,82 +1110,123 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
             logger.info("No city found in query, skipping local store search")
             return []
         
-        # Determine store type from query
-        store_type = get_store_type_from_query(query)
+        # Determine store type/category from query
+        store_category = get_foursquare_category(query)
         
-        # Build search query for local stores
-        search_query = f"{store_type} in {city_info.get('name', city)}"
+        logger.info(f"Foursquare search: category='{store_category}' near {city_info.get('name')}")
         
-        logger.info(f"Google Places search: '{search_query}' at {city_info}")
-        
-        # Use Google Places Text Search API
+        # Use Foursquare Places API
         async with httpx.AsyncClient() as client:
-            # Text Search endpoint
-            url = "https://places.googleapis.com/v1/places:searchText"
+            url = "https://api.foursquare.com/v3/places/search"
             
             headers = {
-                "Content-Type": "application/json",
-                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.regularOpeningHours,places.businessStatus,places.types,places.googleMapsUri"
+                "Accept": "application/json",
+                "Authorization": FOURSQUARE_API_KEY
             }
             
-            request_body = {
-                "textQuery": search_query,
-                "maxResultCount": min(max_results, 20),
-                "locationBias": {
-                    "circle": {
-                        "center": {
-                            "latitude": city_info["lat"],
-                            "longitude": city_info["lng"]
-                        },
-                        "radius": 25000.0  # 25km radius
-                    }
-                }
+            params = {
+                "query": store_category,
+                "ll": f"{city_info['lat']},{city_info['lng']}",
+                "radius": 25000,  # 25km radius
+                "limit": min(max_results, 50),
+                "fields": "fsq_id,name,location,tel,website,rating,stats,hours,price,categories,distance"
             }
             
-            response = await client.post(url, json=request_body, headers=headers, timeout=30.0)
+            response = await client.get(url, params=params, headers=headers, timeout=30.0)
             
             if response.status_code != 200:
-                logger.error(f"Google Places API error: {response.status_code} - {response.text}")
+                logger.error(f"Foursquare API error: {response.status_code} - {response.text}")
                 return []
             
             data = response.json()
             
             local_stores = []
-            for place in data.get("places", []):
-                display_name = place.get("displayName", {})
+            for place in data.get("results", []):
+                location = place.get("location", {})
+                categories = place.get("categories", [])
+                category_names = [cat.get("name", "") for cat in categories]
                 
-                # Get opening hours
-                hours_info = place.get("regularOpeningHours", {})
-                weekday_text = hours_info.get("weekdayDescriptions", [])
-                is_open = hours_info.get("openNow")
+                # Build full address
+                address_parts = []
+                if location.get("address"):
+                    address_parts.append(location.get("address"))
+                if location.get("locality"):
+                    address_parts.append(location.get("locality"))
+                if location.get("region"):
+                    address_parts.append(location.get("region"))
+                if location.get("postcode"):
+                    address_parts.append(location.get("postcode"))
+                
+                full_address = ", ".join(address_parts) if address_parts else location.get("formatted_address", "")
+                
+                # Get hours info
+                hours_info = place.get("hours", {})
+                is_open = hours_info.get("open_now")
+                regular_hours = hours_info.get("regular", [])
                 
                 store = {
-                    "place_id": place.get("id", ""),
-                    "name": display_name.get("text", "Unknown Store"),
-                    "address": place.get("formattedAddress", ""),
-                    "phone": place.get("internationalPhoneNumber") or place.get("nationalPhoneNumber", ""),
-                    "website": place.get("websiteUri", ""),
+                    "place_id": place.get("fsq_id", ""),
+                    "name": place.get("name", "Unknown Store"),
+                    "address": full_address,
+                    "locality": location.get("locality", city_info.get("name")),
+                    "region": location.get("region", ""),
+                    "postcode": location.get("postcode", ""),
+                    "phone": place.get("tel", ""),
+                    "website": place.get("website", ""),
                     "rating": place.get("rating"),
-                    "review_count": place.get("userRatingCount", 0),
-                    "business_status": place.get("businessStatus", "OPERATIONAL"),
+                    "review_count": place.get("stats", {}).get("total_ratings", 0),
                     "is_open_now": is_open,
-                    "opening_hours": weekday_text[:3] if weekday_text else [],  # First 3 days
-                    "google_maps_url": place.get("googleMapsUri", ""),
-                    "types": place.get("types", []),
+                    "opening_hours": [h.get("display", "") for h in regular_hours[:3]] if regular_hours else [],
+                    "categories": category_names,
+                    "distance_meters": place.get("distance"),
+                    "price_level": place.get("price"),
                     "city": city_info.get("name", city),
                     "country": city_info.get("country", ""),
                     "is_local_store": True,
-                    "data_source": "Google Places"
+                    "data_source": "Foursquare",
+                    "google_maps_url": f"https://www.google.com/maps/search/?api=1&query={place.get('name', '').replace(' ', '+')}+{location.get('locality', '').replace(' ', '+')}"
                 }
                 local_stores.append(store)
             
-            logger.info(f"Google Places returned {len(local_stores)} local stores in {city_info.get('name')}")
+            logger.info(f"Foursquare returned {len(local_stores)} local stores in {city_info.get('name')}")
             return local_stores
             
     except Exception as e:
-        logger.error(f"Google Places API error: {str(e)}")
+        logger.error(f"Foursquare API error: {str(e)}")
         return []
+
+def get_foursquare_category(query: str) -> str:
+    """Map product query to Foursquare search term"""
+    query_lower = query.lower()
+    
+    if any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
+        return "mobile phone store"
+    elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
+        return "computer store"
+    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics"]):
+        return "electronics store"
+    elif any(word in query_lower for word in ["camera", "dslr", "mirrorless"]):
+        return "camera store"
+    elif any(word in query_lower for word in ["headphone", "earphone", "earbuds", "speaker", "audio"]):
+        return "electronics store"
+    elif any(word in query_lower for word in ["watch", "smartwatch"]):
+        return "watch store"
+    elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
+        return "home improvement store"
+    elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
+        return "furniture store"
+    elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
+        return "clothing store"
+    elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal"]):
+        return "shoe store"
+    elif any(word in query_lower for word in ["jewel", "gold", "diamond", "ring", "necklace"]):
+        return "jewelry store"
+    elif any(word in query_lower for word in ["grocery", "food", "vegetable", "fruit"]):
+        return "grocery store"
+    else:
+        # Extract the main product term
+        words = query_lower.replace("price", "").replace("in", "").split()
+        return f"{' '.join(words[:2])} store" if words else "store"
 
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
