@@ -35,7 +35,14 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **Fixed Multi-Word City Detection**: Cities like "new york", "san francisco", "abu dhabi" are properly handled
 - ✅ **Word Boundary Matching**: Added regex word boundary checks to prevent false positives (e.g., "tiles" no longer matches "textiles")
 - ✅ **Improved Relevance Filtering**: Stores are now correctly marked as relevant based on product keywords, not city names
-- ✅ **Comprehensive Testing**: 14 backend tests created and all passed
+- ✅ **Added 30+ Product-to-Shop Mappings**: fan, lights, ceiling, window, sliding, door, ac, refrigerator, lamp, appliances, etc.
+- ✅ **Fixed Overpass Query**: No longer returns ALL shops when no category match - only searches specific shop types
+- ✅ **Comprehensive Testing**: 25+ backend tests created and all passed
+- ✅ **Verified Results**:
+  - "fan in bangalore" → Electronics stores (Voltas, Sony, Cromā)
+  - "sliding windows in bangalore" → Hardware stores (Fenesta Windows, Hardware Electricals)
+  - "ceiling lights in bangalore" → Lighting/electronics stores
+  - "mirror in bangalore" → Interior decoration stores
 
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
