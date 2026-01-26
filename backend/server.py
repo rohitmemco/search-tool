@@ -1008,6 +1008,179 @@ def get_direct_vendor_link(source_name: str, product_name: str) -> str:
     # Fallback: Google search for the vendor + product
     return f"https://www.google.com/search?q={encoded_product}+{source_name.replace(' ', '+')}"
 
+# ================== GOOGLE PLACES API - LOCAL STORES ==================
+# City coordinates for location-based searches
+CITY_COORDINATES = {
+    # India
+    "bangalore": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
+    "bengaluru": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
+    "banglore": {"lat": 12.9716, "lng": 77.5946, "country": "India"},
+    "mumbai": {"lat": 19.0760, "lng": 72.8777, "country": "India"},
+    "delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India"},
+    "new delhi": {"lat": 28.6139, "lng": 77.2090, "country": "India"},
+    "chennai": {"lat": 13.0827, "lng": 80.2707, "country": "India"},
+    "hyderabad": {"lat": 17.3850, "lng": 78.4867, "country": "India"},
+    "kolkata": {"lat": 22.5726, "lng": 88.3639, "country": "India"},
+    "pune": {"lat": 18.5204, "lng": 73.8567, "country": "India"},
+    "ahmedabad": {"lat": 23.0225, "lng": 72.5714, "country": "India"},
+    "jaipur": {"lat": 26.9124, "lng": 75.7873, "country": "India"},
+    "lucknow": {"lat": 26.8467, "lng": 80.9462, "country": "India"},
+    "india": {"lat": 20.5937, "lng": 78.9629, "country": "India"},
+    # USA
+    "new york": {"lat": 40.7128, "lng": -74.0060, "country": "USA"},
+    "los angeles": {"lat": 34.0522, "lng": -118.2437, "country": "USA"},
+    "chicago": {"lat": 41.8781, "lng": -87.6298, "country": "USA"},
+    "san francisco": {"lat": 37.7749, "lng": -122.4194, "country": "USA"},
+    "usa": {"lat": 37.0902, "lng": -95.7129, "country": "USA"},
+    # UK
+    "london": {"lat": 51.5074, "lng": -0.1278, "country": "UK"},
+    "manchester": {"lat": 53.4808, "lng": -2.2426, "country": "UK"},
+    "uk": {"lat": 55.3781, "lng": -3.4360, "country": "UK"},
+    # UAE
+    "dubai": {"lat": 25.2048, "lng": 55.2708, "country": "UAE"},
+    "abu dhabi": {"lat": 24.4539, "lng": 54.3773, "country": "UAE"},
+    "uae": {"lat": 23.4241, "lng": 53.8478, "country": "UAE"},
+    # Others
+    "tokyo": {"lat": 35.6762, "lng": 139.6503, "country": "Japan"},
+    "sydney": {"lat": -33.8688, "lng": 151.2093, "country": "Australia"},
+    "toronto": {"lat": 43.6532, "lng": -79.3832, "country": "Canada"},
+    "paris": {"lat": 48.8566, "lng": 2.3522, "country": "France"},
+    "berlin": {"lat": 52.5200, "lng": 13.4050, "country": "Germany"},
+}
+
+def get_city_from_query(query: str) -> Optional[Dict]:
+    """Extract city coordinates from search query"""
+    query_lower = query.lower()
+    for city_name, coords in CITY_COORDINATES.items():
+        if city_name in query_lower:
+            return {"name": city_name.title(), **coords}
+    return None
+
+def get_store_type_from_query(query: str) -> str:
+    """Determine store type from product query"""
+    query_lower = query.lower()
+    
+    if any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
+        return "mobile phone store"
+    elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
+        return "computer store"
+    elif any(word in query_lower for word in ["tv", "television", "led", "oled"]):
+        return "electronics store"
+    elif any(word in query_lower for word in ["camera", "dslr", "mirrorless"]):
+        return "camera store"
+    elif any(word in query_lower for word in ["headphone", "earphone", "earbuds", "speaker", "audio"]):
+        return "electronics store"
+    elif any(word in query_lower for word in ["watch", "smartwatch"]):
+        return "watch store"
+    elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
+        return "tile store"
+    elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
+        return "furniture store"
+    elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
+        return "clothing store"
+    elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal"]):
+        return "shoe store"
+    else:
+        return "store"
+
+async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 10) -> List[Dict]:
+    """
+    Search for LOCAL stores using Google Places API.
+    Returns actual store listings with real addresses, phone numbers, and websites.
+    """
+    if not GOOGLE_PLACES_API_KEY:
+        logger.warning("Google Places API key not configured")
+        return []
+    
+    try:
+        # Get city coordinates from query or provided city
+        city_info = None
+        if city:
+            city_info = CITY_COORDINATES.get(city.lower())
+        if not city_info:
+            city_info = get_city_from_query(query)
+        
+        if not city_info:
+            logger.info("No city found in query, skipping local store search")
+            return []
+        
+        # Determine store type from query
+        store_type = get_store_type_from_query(query)
+        
+        # Build search query for local stores
+        search_query = f"{store_type} in {city_info.get('name', city)}"
+        
+        logger.info(f"Google Places search: '{search_query}' at {city_info}")
+        
+        # Use Google Places Text Search API
+        async with httpx.AsyncClient() as client:
+            # Text Search endpoint
+            url = "https://places.googleapis.com/v1/places:searchText"
+            
+            headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.internationalPhoneNumber,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,places.regularOpeningHours,places.businessStatus,places.types,places.googleMapsUri"
+            }
+            
+            request_body = {
+                "textQuery": search_query,
+                "maxResultCount": min(max_results, 20),
+                "locationBias": {
+                    "circle": {
+                        "center": {
+                            "latitude": city_info["lat"],
+                            "longitude": city_info["lng"]
+                        },
+                        "radius": 25000.0  # 25km radius
+                    }
+                }
+            }
+            
+            response = await client.post(url, json=request_body, headers=headers, timeout=30.0)
+            
+            if response.status_code != 200:
+                logger.error(f"Google Places API error: {response.status_code} - {response.text}")
+                return []
+            
+            data = response.json()
+            
+            local_stores = []
+            for place in data.get("places", []):
+                display_name = place.get("displayName", {})
+                
+                # Get opening hours
+                hours_info = place.get("regularOpeningHours", {})
+                weekday_text = hours_info.get("weekdayDescriptions", [])
+                is_open = hours_info.get("openNow")
+                
+                store = {
+                    "place_id": place.get("id", ""),
+                    "name": display_name.get("text", "Unknown Store"),
+                    "address": place.get("formattedAddress", ""),
+                    "phone": place.get("internationalPhoneNumber") or place.get("nationalPhoneNumber", ""),
+                    "website": place.get("websiteUri", ""),
+                    "rating": place.get("rating"),
+                    "review_count": place.get("userRatingCount", 0),
+                    "business_status": place.get("businessStatus", "OPERATIONAL"),
+                    "is_open_now": is_open,
+                    "opening_hours": weekday_text[:3] if weekday_text else [],  # First 3 days
+                    "google_maps_url": place.get("googleMapsUri", ""),
+                    "types": place.get("types", []),
+                    "city": city_info.get("name", city),
+                    "country": city_info.get("country", ""),
+                    "is_local_store": True,
+                    "data_source": "Google Places"
+                }
+                local_stores.append(store)
+            
+            logger.info(f"Google Places returned {len(local_stores)} local stores in {city_info.get('name')}")
+            return local_stores
+            
+    except Exception as e:
+        logger.error(f"Google Places API error: {str(e)}")
+        return []
+
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
     """
