@@ -1427,8 +1427,8 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         "currency_symbol": currency_symbol,
                         "currency_code": params["currency"],
                         "source": source_name,
-                        # Prefer actual product link from SerpAPI, fallback to our generated search URL
-                        "source_url": item.get("link") or direct_link,
+                        # Use direct vendor link for better UX
+                        "source_url": direct_link,  # Direct to vendor website
                         "google_shopping_url": item.get("link", ""),  # Keep Google link as backup
                         "description": item.get("snippet", ""),
                         "rating": item.get("rating") if item.get("rating") else None,
@@ -1443,7 +1443,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
                         # Real vendor info from SerpAPI (only what's actually available)
                         "vendor": {
                             "vendor_name": source_name,
-                            "vendor_website": item.get("link") or direct_link,
+                            "vendor_website": direct_link,  # Direct to vendor website
                             "is_real_data": True,
                             "data_source": "Google Shopping"
                         }
