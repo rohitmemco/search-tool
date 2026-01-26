@@ -1574,7 +1574,7 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
         if w in CITY_COORDINATES:
             continue
         # Add as product keyword
-            product_keywords.append(w)
+        product_keywords.append(w)
     
     # Build dynamic search terms
     search_terms = []
