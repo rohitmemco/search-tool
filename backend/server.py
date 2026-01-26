@@ -959,11 +959,38 @@ def get_direct_vendor_link(source_name: str, product_name: str) -> str:
         "imagine apple": f"https://www.imagineonline.store/catalogsearch/result/?q={encoded_product}",
         "imagine apple premium reseller": f"https://www.imagineonline.store/catalogsearch/result/?q={encoded_product}",
         "apple store": f"https://www.apple.com/in/shop/buy-iphone",
+        "apple": f"https://www.apple.com/in/shop/buy-iphone",
+        "mi": f"https://www.mi.com/in/search?keyword={encoded_product}",
+        "mi.com": f"https://www.mi.com/in/search?keyword={encoded_product}",
+        "samsung": f"https://www.samsung.com/in/search/?searchvalue={encoded_product}",
+        "oneplus": f"https://www.oneplus.in/search?keyword={encoded_product}",
+        "dell": f"https://www.dell.com/en-in/search/{encoded_product}",
+        "dell india": f"https://www.dell.com/en-in/search/{encoded_product}",
+        "hp": f"https://www.hp.com/in-en/shop/search?q={encoded_product}",
+        "hp india": f"https://www.hp.com/in-en/shop/search?q={encoded_product}",
+        "lenovo": f"https://www.lenovo.com/in/en/search?text={encoded_product}",
+        "asus": f"https://www.asus.com/in/searchresult?searchType=products&searchKey={encoded_product}",
         
-        # B2B India
-        "indiamart": f"https://www.indiamart.com/proddetail/{encoded_product}",
+        # B2B India - Directory Sites
+        "indiamart": f"https://dir.indiamart.com/search.mp?ss={encoded_product}",
         "tradeindia": f"https://www.tradeindia.com/search.html?search_query={encoded_product}",
         "exportersindia": f"https://www.exportersindia.com/search.htm?search={encoded_product}",
+        "justdial": f"https://www.justdial.com/search?q={encoded_product}",
+        "jd": f"https://www.justdial.com/search?q={encoded_product}",
+        "sulekha": f"https://www.sulekha.com/search?q={encoded_product}",
+        "aajjo": f"https://www.aajjo.com/search?q={encoded_product}",
+        "aajjo.com": f"https://www.aajjo.com/search?q={encoded_product}",
+        "go4worldbusiness": f"https://www.go4worldbusiness.com/search/?keyword={encoded_product}",
+        "exportershub": f"https://www.exportershub.com/search?q={encoded_product}",
+        "dial4trade": f"https://www.dial4trade.com/search?q={encoded_product}",
+        "infoisinfo": f"https://www.infoisinfo.co.in/search/{encoded_product}",
+        "ovantica": f"https://www.ovantica.com/search?q={encoded_product}",
+        "ovantica.com": f"https://www.ovantica.com/search?q={encoded_product}",
+        
+        # Construction/Building Materials India
+        "buildmart": f"https://www.buildmart.in/search?q={encoded_product}",
+        "materialtree": f"https://www.materialtree.com/search?q={encoded_product}",
+        "buildingmaterialsdirect": f"https://www.buildingmaterialsdirect.co.in/search?q={encoded_product}",
         
         # US E-commerce
         "amazon.com": f"https://www.amazon.com/s?k={encoded_product}",
@@ -1011,8 +1038,8 @@ def get_direct_vendor_link(source_name: str, product_name: str) -> str:
         if vendor_key in source_lower or source_lower in vendor_key:
             return url
     
-    # Fallback: Google search for the vendor + product
-    return f"https://www.google.com/search?q={encoded_product}+{source_name.replace(' ', '+')}"
+    # Return None to signal we should use the original SerpAPI link
+    return None
 
 # ================== GOOGLE PLACES API - LOCAL STORES ==================
 # City coordinates for location-based searches
