@@ -1413,21 +1413,17 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
         {product.vendor && (
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Vendor</p>
-              {product.vendor.vendor_type && (
-                <Badge variant="outline" className="text-xs">
-                  {product.vendor.vendor_type.includes("Factory") ? "🏭" : 
-                   product.vendor.vendor_type.includes("Wholesale") ? "📦" :
-                   product.vendor.vendor_type.includes("Local") ? "🏪" : "🌐"} 
-                  {product.vendor.vendor_type}
+              <p className="text-xs text-slate-500 dark:text-slate-400">Seller</p>
+              {product.is_real_data && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  ✓ Live Data
                 </Badge>
               )}
             </div>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{product.vendor.vendor_name}</p>
-            {product.vendor.verification_status && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ {product.vendor.verification_status}</p>
+            {product.vendor.data_source && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">via {product.vendor.data_source}</p>
             )}
-            <VendorInfoModal vendor={product.vendor} productName={product.name} />
           </div>
         )}
         
