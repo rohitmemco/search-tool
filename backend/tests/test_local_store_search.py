@@ -336,7 +336,7 @@ class TestMultiWordCityNames:
         assert response.status_code == 200
         data = response.json()
         
-        local_stores = data.get("local_stores", [])
+        local_stores = data.get("local_stores") or []
         relevant_stores = [s for s in local_stores if s.get("is_relevant", False)]
         
         # Check that stores are not marked relevant just for having 'abu' or 'dhabi' in name
