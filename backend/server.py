@@ -1091,13 +1091,9 @@ def get_store_type_from_query(query: str) -> str:
 
 async def search_local_stores_with_places_api(query: str, city: str = None, max_results: int = 10) -> List[Dict]:
     """
-    Search for LOCAL stores using Foursquare Places API (FREE).
-    Returns actual store listings with real addresses, phone numbers, and websites.
+    Search for LOCAL stores using OpenStreetMap Overpass API (FREE, No API Key Required).
+    Returns actual store listings with real names and addresses from OSM crowdsourced data.
     """
-    if not FOURSQUARE_API_KEY:
-        logger.warning("Foursquare API key not configured")
-        return []
-    
     try:
         # Get city coordinates from query or provided city
         city_info = None
@@ -1110,123 +1106,173 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
             logger.info("No city found in query, skipping local store search")
             return []
         
-        # Determine store type/category from query
-        store_category = get_foursquare_category(query)
+        # Determine OSM shop category from query
+        shop_category = get_osm_shop_category(query)
+        city_name = city_info.get("name", city).title()
         
-        logger.info(f"Foursquare search: category='{store_category}' near {city_info.get('name')}")
+        # Map common city names to OSM area names
+        osm_area_names = {
+            "bangalore": "Bengaluru",
+            "bengaluru": "Bengaluru",
+            "banglore": "Bengaluru",
+            "mumbai": "Mumbai",
+            "delhi": "Delhi",
+            "new delhi": "Delhi",
+            "chennai": "Chennai",
+            "hyderabad": "Hyderabad",
+            "kolkata": "Kolkata",
+            "pune": "Pune",
+            "ahmedabad": "Ahmedabad",
+            "jaipur": "Jaipur",
+            "lucknow": "Lucknow",
+            "new york": "New York",
+            "los angeles": "Los Angeles",
+            "chicago": "Chicago",
+            "san francisco": "San Francisco",
+            "london": "London",
+            "manchester": "Manchester",
+            "dubai": "Dubai",
+            "abu dhabi": "Abu Dhabi",
+            "tokyo": "Tokyo",
+            "sydney": "Sydney",
+            "toronto": "Toronto",
+            "paris": "Paris",
+            "berlin": "Berlin",
+        }
         
-        # Use Foursquare Places API
+        osm_area = osm_area_names.get(city_name.lower(), city_name)
+        
+        logger.info(f"OpenStreetMap search: shop='{shop_category}' in area '{osm_area}'")
+        
+        # Build Overpass API query
+        overpass_query = f'''
+[out:json][timeout:25];
+area["name"="{osm_area}"]->.searchArea;
+(
+  node["shop"="{shop_category}"](area.searchArea);
+  way["shop"="{shop_category}"](area.searchArea);
+  node["shop"~"electronics|mobile_phone|computer"](area.searchArea);
+  way["shop"~"electronics|mobile_phone|computer"](area.searchArea);
+);
+out body {max_results};
+>;
+out skel qt;
+'''
+        
         async with httpx.AsyncClient() as client:
-            url = "https://api.foursquare.com/v3/places/search"
-            
-            headers = {
-                "Accept": "application/json",
-                "Authorization": FOURSQUARE_API_KEY
-            }
-            
-            params = {
-                "query": store_category,
-                "ll": f"{city_info['lat']},{city_info['lng']}",
-                "radius": 25000,  # 25km radius
-                "limit": min(max_results, 50),
-                "fields": "fsq_id,name,location,tel,website,rating,stats,hours,price,categories,distance"
-            }
-            
-            response = await client.get(url, params=params, headers=headers, timeout=30.0)
+            response = await client.post(
+                "https://overpass-api.de/api/interpreter",
+                data=overpass_query,
+                timeout=30.0
+            )
             
             if response.status_code != 200:
-                logger.error(f"Foursquare API error: {response.status_code} - {response.text}")
+                logger.error(f"Overpass API error: {response.status_code}")
                 return []
             
             data = response.json()
             
             local_stores = []
-            for place in data.get("results", []):
-                location = place.get("location", {})
-                categories = place.get("categories", [])
-                category_names = [cat.get("name", "") for cat in categories]
+            seen_names = set()  # Avoid duplicates
+            
+            for element in data.get("elements", []):
+                tags = element.get("tags", {})
+                name = tags.get("name")
                 
-                # Build full address
+                # Skip elements without names or duplicates
+                if not name or name in seen_names:
+                    continue
+                seen_names.add(name)
+                
+                # Build address from OSM tags
                 address_parts = []
-                if location.get("address"):
-                    address_parts.append(location.get("address"))
-                if location.get("locality"):
-                    address_parts.append(location.get("locality"))
-                if location.get("region"):
-                    address_parts.append(location.get("region"))
-                if location.get("postcode"):
-                    address_parts.append(location.get("postcode"))
+                if tags.get("addr:housenumber"):
+                    address_parts.append(tags.get("addr:housenumber"))
+                if tags.get("addr:street"):
+                    address_parts.append(tags.get("addr:street"))
+                if tags.get("addr:suburb") or tags.get("addr:neighbourhood"):
+                    address_parts.append(tags.get("addr:suburb") or tags.get("addr:neighbourhood"))
                 
-                full_address = ", ".join(address_parts) if address_parts else location.get("formatted_address", "")
+                full_address = ", ".join(address_parts) if address_parts else f"Near {osm_area}"
                 
-                # Get hours info
-                hours_info = place.get("hours", {})
-                is_open = hours_info.get("open_now")
-                regular_hours = hours_info.get("regular", [])
+                # Get coordinates
+                lat = element.get("lat")
+                lon = element.get("lon")
+                
+                # Calculate approximate distance from city center
+                distance_meters = None
+                if lat and lon:
+                    import math
+                    city_lat = city_info.get("lat", 0)
+                    city_lon = city_info.get("lng", 0)
+                    # Haversine formula approximation
+                    dlat = math.radians(lat - city_lat)
+                    dlon = math.radians(lon - city_lon)
+                    a = math.sin(dlat/2)**2 + math.cos(math.radians(city_lat)) * math.cos(math.radians(lat)) * math.sin(dlon/2)**2
+                    c = 2 * math.asin(math.sqrt(a))
+                    distance_meters = int(6371000 * c)  # Earth radius in meters
                 
                 store = {
-                    "place_id": place.get("fsq_id", ""),
-                    "name": place.get("name", "Unknown Store"),
+                    "place_id": str(element.get("id", "")),
+                    "name": name,
                     "address": full_address,
-                    "locality": location.get("locality", city_info.get("name")),
-                    "region": location.get("region", ""),
-                    "postcode": location.get("postcode", ""),
-                    "phone": place.get("tel", ""),
-                    "website": place.get("website", ""),
-                    "rating": place.get("rating"),
-                    "review_count": place.get("stats", {}).get("total_ratings", 0),
-                    "is_open_now": is_open,
-                    "opening_hours": [h.get("display", "") for h in regular_hours[:3]] if regular_hours else [],
-                    "categories": category_names,
-                    "distance_meters": place.get("distance"),
-                    "price_level": place.get("price"),
-                    "city": city_info.get("name", city),
+                    "locality": osm_area,
+                    "region": tags.get("addr:state", city_info.get("country", "").title()),
+                    "postcode": tags.get("addr:postcode", ""),
+                    "phone": tags.get("phone") or tags.get("contact:phone", ""),
+                    "website": tags.get("website") or tags.get("contact:website", ""),
+                    "rating": None,  # OSM doesn't have ratings
+                    "review_count": 0,
+                    "is_open_now": None,  # Would need opening_hours parsing
+                    "opening_hours": [tags.get("opening_hours")] if tags.get("opening_hours") else [],
+                    "categories": [tags.get("shop", "store"), tags.get("brand", "")] if tags.get("brand") else [tags.get("shop", "store")],
+                    "distance_meters": distance_meters,
+                    "price_level": None,
+                    "city": osm_area,
                     "country": city_info.get("country", ""),
                     "is_local_store": True,
-                    "data_source": "Foursquare",
-                    "google_maps_url": f"https://www.google.com/maps/search/?api=1&query={place.get('name', '').replace(' ', '+')}+{location.get('locality', '').replace(' ', '+')}"
+                    "data_source": "OpenStreetMap",
+                    "google_maps_url": f"https://www.google.com/maps/search/?api=1&query={name.replace(' ', '+')}+{osm_area.replace(' ', '+')}" if lat and lon else f"https://www.google.com/maps/search/?api=1&query={name.replace(' ', '+')}",
+                    "coordinates": {"lat": lat, "lon": lon} if lat and lon else None
                 }
                 local_stores.append(store)
+                
+                if len(local_stores) >= max_results:
+                    break
             
-            logger.info(f"Foursquare returned {len(local_stores)} local stores in {city_info.get('name')}")
+            logger.info(f"OpenStreetMap returned {len(local_stores)} local stores in {osm_area}")
             return local_stores
             
     except Exception as e:
-        logger.error(f"Foursquare API error: {str(e)}")
+        logger.error(f"OpenStreetMap Overpass API error: {str(e)}")
         return []
 
-def get_foursquare_category(query: str) -> str:
-    """Map product query to Foursquare search term"""
+def get_osm_shop_category(query: str) -> str:
+    """Map product query to OpenStreetMap shop tag"""
     query_lower = query.lower()
     
     if any(word in query_lower for word in ["phone", "mobile", "iphone", "samsung", "xiaomi", "oneplus", "vivo", "oppo", "realme"]):
-        return "mobile phone store"
+        return "mobile_phone"
     elif any(word in query_lower for word in ["laptop", "computer", "pc", "desktop", "macbook"]):
-        return "computer store"
-    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics"]):
-        return "electronics store"
-    elif any(word in query_lower for word in ["camera", "dslr", "mirrorless"]):
-        return "camera store"
-    elif any(word in query_lower for word in ["headphone", "earphone", "earbuds", "speaker", "audio"]):
-        return "electronics store"
+        return "computer"
+    elif any(word in query_lower for word in ["tv", "television", "led", "oled", "electronics", "camera", "headphone", "earphone", "speaker", "audio"]):
+        return "electronics"
     elif any(word in query_lower for word in ["watch", "smartwatch"]):
-        return "watch store"
+        return "watches"
     elif any(word in query_lower for word in ["tile", "bathroom", "kitchen", "flooring", "ceramic"]):
-        return "home improvement store"
+        return "doityourself"
     elif any(word in query_lower for word in ["furniture", "sofa", "bed", "table", "chair"]):
-        return "furniture store"
+        return "furniture"
     elif any(word in query_lower for word in ["cloth", "shirt", "pant", "dress", "fashion"]):
-        return "clothing store"
+        return "clothes"
     elif any(word in query_lower for word in ["shoe", "footwear", "sneaker", "sandal"]):
-        return "shoe store"
+        return "shoes"
     elif any(word in query_lower for word in ["jewel", "gold", "diamond", "ring", "necklace"]):
-        return "jewelry store"
+        return "jewelry"
     elif any(word in query_lower for word in ["grocery", "food", "vegetable", "fruit"]):
-        return "grocery store"
+        return "supermarket"
     else:
-        # Extract the main product term
-        words = query_lower.replace("price", "").replace("in", "").split()
-        return f"{' '.join(words[:2])} store" if words else "store"
+        return "electronics"  # Default to electronics for general product searches
 
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
