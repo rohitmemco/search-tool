@@ -1291,25 +1291,34 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         # Get OSM area name from city_info (already properly formatted)
         osm_area = city_info.get("name", city_name)
         
-        logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
-        
-        # Get shop category - if empty, skip local store search
+        # Get shop category and product keywords for dynamic search
         shop_regex = shop_categories.get('shop', '')
+        product_keywords = shop_categories.get('keywords', [])
         
-        if not shop_regex:
-            logger.info(f"No specific shop category found for query, skipping local store search")
+        logger.info(f"OpenStreetMap search: shop_regex={shop_regex}, keywords={product_keywords} in area '{osm_area}'")
+        
+        if not shop_regex and not product_keywords:
+            logger.info(f"No search criteria found for query, skipping local store search")
             return []
         
-        # Build product-specific Overpass query - only search for relevant shop types
+        # Build dynamic Overpass query - search by shop type AND/OR name containing keywords
+        # This makes it work like online search - finding stores relevant to the product
+        name_search = ""
+        if product_keywords:
+            # Search for stores with product keywords in their name
+            keyword_regex = '|'.join(product_keywords)
+            name_search = f'node["name"~"{keyword_regex}",i]["shop"](area.searchArea);'
+        
         overpass_query = f'''[out:json][timeout:25];
 area["name"="{osm_area}"]->.searchArea;
 (
   node["shop"~"{shop_regex}"](area.searchArea);
   way["shop"~"{shop_regex}"](area.searchArea);
+  {name_search}
 );
-out body {max_results};'''
+out body {max_results * 2};'''
         
-        logger.info(f"Overpass query for area '{osm_area}' with shop regex: {shop_regex}")
+        logger.info(f"Overpass query for area '{osm_area}' - dynamic search")
         
         # List of Overpass API servers for fallback
         overpass_servers = [
