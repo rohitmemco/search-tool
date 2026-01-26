@@ -30,6 +30,13 @@ Build a comprehensive web-based application that enables users to search for any
 
 ## What's Been Implemented
 
+### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
+- ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
+- ✅ **Info Banner**: Yellow warning banner directs users to "Local Stores" tab for direct contact information
+- ✅ **Contact Availability Notice**: Each vendor card shows "Contact details not available for online sellers"
+- ✅ **Local Stores Priority**: Local Stores tab emphasized as the source for contact info (phone, email, address)
+- ✅ **"Not Available" Placeholders**: All missing fields clearly show "not available" instead of being hidden
+
 ### Jan 26, 2026 - Local Store Search (OpenStreetMap) ✅ COMPLETE
 - ✅ **OpenStreetMap Overpass API Integration** - FREE, no API key required!
 - ✅ **Multiple Fallback Servers** - Uses 3 Overpass API servers for reliability (overpass-api.de, kumi.systems, mail.ru)
