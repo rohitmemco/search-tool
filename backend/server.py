@@ -1144,40 +1144,20 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         
         logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
         
-        # Build comprehensive Overpass API query including factories, manufacturing, wholesale, retail
+        # Build Overpass API query - includes retail shops, factories, wholesale, manufacturing
+        # Simplified query to avoid timeout
         overpass_query = f'''
-[out:json][timeout:30];
+[out:json][timeout:25];
 area["name"="{osm_area}"]->.searchArea;
 (
-  // Retail Shops
-  node["shop"~"{shop_categories['shop']}"](area.searchArea);
-  way["shop"~"{shop_categories['shop']}"](area.searchArea);
-  
-  // Factory Outlets & Manufacturing Units
-  node["industrial"~"factory|warehouse|manufacturing"](area.searchArea);
-  way["industrial"~"factory|warehouse|manufacturing"](area.searchArea);
-  node["man_made"~"works|factory"](area.searchArea);
-  way["man_made"~"works|factory"](area.searchArea);
-  node["landuse"="industrial"]["name"](area.searchArea);
-  way["landuse"="industrial"]["name"](area.searchArea);
-  
-  // Wholesale & Trade
-  node["shop"="wholesale"](area.searchArea);
-  way["shop"="wholesale"](area.searchArea);
-  node["trade"](area.searchArea);
-  way["trade"](area.searchArea);
-  
-  // Office/Company locations (brand offices, showrooms)
-  node["office"~"company|it"](area.searchArea);
-  way["office"~"company|it"](area.searchArea);
-  
-  // Craft/Manufacturing workshops
-  node["craft"~"{shop_categories.get('craft', 'electronics')}"](area.searchArea);
-  way["craft"~"{shop_categories.get('craft', 'electronics')}"](area.searchArea);
+  node["shop"~"{shop_categories['shop']}|wholesale"](area.searchArea);
+  way["shop"~"{shop_categories['shop']}|wholesale"](area.searchArea);
+  node["industrial"]["name"](area.searchArea);
+  way["industrial"]["name"](area.searchArea);
+  node["office"~"company"]["name"](area.searchArea);
+  node["craft"]["name"](area.searchArea);
 );
-out body {max_results * 2};
->;
-out skel qt;
+out body {max_results};
 '''
         
         async with httpx.AsyncClient() as client:
