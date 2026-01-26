@@ -26,8 +26,11 @@ db = client[os.environ['DB_NAME']]
 # SerpAPI configuration
 SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
 
-# Google Places API configuration
-GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
+# Google Places API configuration (disabled - requires payment)
+# GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
+
+# Foursquare Places API configuration (FREE - 100k calls/month)
+FOURSQUARE_API_KEY = os.environ.get('FOURSQUARE_API_KEY', '')
 
 # Create the main app without a prefix
 app = FastAPI()
