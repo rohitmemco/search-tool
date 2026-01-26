@@ -26,7 +26,7 @@ db = client[os.environ['DB_NAME']]
 # SerpAPI configuration
 SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
 
-# Google Places API configuration (disabled - requires payment)
+# Foursquare API configuration (disabled - requires payment)
 # GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
 
 # Foursquare Places API configuration (FREE - 100k calls/month)
@@ -82,7 +82,7 @@ class SearchResponse(BaseModel):
     data_sources: List[Dict[str, Any]]
     # Advanced filter options extracted from AI
     available_filters: Optional[Dict[str, Any]] = None
-    # Local stores from Google Places API
+    # Local stores from Foursquare API
     local_stores: Optional[List[Dict[str, Any]]] = None
     local_stores_city: Optional[str] = None
 
@@ -1730,7 +1730,7 @@ async def search_products(request: SearchRequest):
         
         logger.info(f"Location: {location_data}, Currency: {currency_info}")
         
-        # Run both searches in parallel: SerpAPI for online prices + Google Places for local stores
+        # Run both searches in parallel: SerpAPI for online prices + Foursquare for local stores
         serpapi_task = search_with_serpapi(query, location_data["country"], request.max_results, location_data.get("city", ""))
         places_task = search_local_stores_with_places_api(query, location_data.get("city", ""), 10)
         
@@ -1771,10 +1771,10 @@ async def search_products(request: SearchRequest):
                         "description": f"Live prices from {source_name}"
                     })
             
-            # Add Google Places as a data source if we have local stores
+            # Add Foursquare as a data source if we have local stores
             if local_stores:
                 data_sources.append({
-                    "name": "Google Places",
+                    "name": "Foursquare",
                     "url": "https://maps.google.com",
                     "type": "Local Stores",
                     "description": f"Local stores in {local_stores_city or 'your area'}"
