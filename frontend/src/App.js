@@ -1142,112 +1142,69 @@ const SmartRecommendations = ({ searchHistory, onSearch }) => {
   );
 };
 
-// Vendor Info Modal Component
+// Vendor Info Modal Component - Simplified for real data only
 const VendorInfoModal = ({ vendor, productName }) => {
-  if (!vendor) return null;
-  
-  const getVerificationColor = (status) => {
-    switch (status) {
-      case "Verified Seller": return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400";
-      case "Premium Vendor": return "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400";
-      case "Trusted Supplier": return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
-      case "Gold Member": return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400";
-      case "Platform Verified": return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
-      case "Local Verified": return "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400";
-      case "ISO Certified": return "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400";
-      case "Trade Assured": return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400";
-      default: return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300";
-    }
-  };
-
-  const getVendorTypeIcon = (type) => {
-    if (type?.includes("Factory") || type?.includes("Manufacturer")) return "🏭";
-    if (type?.includes("Wholesale")) return "📦";
-    if (type?.includes("Local") || type?.includes("Retail")) return "🏪";
-    if (type?.includes("Online")) return "🌐";
-    if (type?.includes("Authorized")) return "✅";
-    return "🏢";
-  };
+  if (!vendor || !vendor.vendor_name) return null;
   
   return (
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="mt-3 w-full text-xs" data-testid="view-vendor-btn">
           <Building2 className="w-3 h-3 mr-1" />
-          View Vendor Details
+          Seller Details
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg dark:bg-slate-800" data-testid="vendor-modal">
+      <DialogContent className="sm:max-w-md dark:bg-slate-800" data-testid="vendor-modal">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-['Manrope'] dark:text-white">
             <Store className="w-5 h-5 text-blue-600" />
-            Vendor Information
+            Seller Information
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-semibold text-lg text-slate-800 dark:text-white">{vendor.vendor_name}</h3>
-              <p className="text-sm text-slate-500 flex items-center gap-1">
-                <span>{getVendorTypeIcon(vendor.vendor_type)}</span>
-                {vendor.vendor_type}
-                {vendor.business_type && <span className="text-slate-400">• {vendor.business_type}</span>}
-              </p>
+              {vendor.is_real_data && (
+                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 mt-1">
+                  ✓ Verified Seller
+                </Badge>
+              )}
             </div>
-            <Badge variant="outline" className={getVerificationColor(vendor.verification_status)}>
-              <BadgeCheck className="w-3 h-3 mr-1" />
-              {vendor.verification_status}
-            </Badge>
           </div>
           
           <div className="bg-slate-50 dark:bg-slate-700 rounded-lg p-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Selling</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Product</p>
             <p className="text-sm font-medium text-slate-800 dark:text-white">{productName}</p>
           </div>
           
-          <div className="grid grid-cols-1 gap-3">
-            <div className="flex items-center gap-3 p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
-                <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Email</p>
-                <a href={`mailto:${vendor.vendor_email}`} className="text-sm font-medium text-blue-600 hover:underline">
-                  {vendor.vendor_email}
-                </a>
-              </div>
+          {vendor.data_source && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Data source: {vendor.data_source}
             </div>
-            
-            <div className="flex items-center gap-3 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center">
-                <Phone className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Phone</p>
-                <a href={`tel:${vendor.vendor_phone}`} className="text-sm font-medium text-emerald-600 hover:underline">
-                  {vendor.vendor_phone}
-                </a>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3 p-3 bg-violet-50/50 dark:bg-violet-900/20 rounded-lg">
-              <div className="w-10 h-10 rounded-full bg-violet-100 dark:bg-violet-800 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Address</p>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{vendor.vendor_address}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{vendor.vendor_city}, {vendor.vendor_country}</p>
-              </div>
-            </div>
-          </div>
+          )}
           
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <div className="text-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-              <Clock className="w-4 h-4 mx-auto text-slate-400 mb-1" />
-              <p className="text-xs text-slate-500 dark:text-slate-400">Response Time</p>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{vendor.response_time}</p>
-            </div>
+          {vendor.vendor_website && (
+            <a
+              href={vendor.vendor_website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-lg transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              Visit {vendor.vendor_name} Website
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+          
+          <div className="text-xs text-slate-400 dark:text-slate-500 text-center">
+            Price and availability data from Google Shopping. Click above to view on seller's website.
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
             <div className="text-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
               <Building2 className="w-4 h-4 mx-auto text-slate-400 mb-1" />
               <p className="text-xs text-slate-500 dark:text-slate-400">In Business</p>
