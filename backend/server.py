@@ -1342,6 +1342,21 @@ out body {max_results};'''
             local_stores = []
             seen_names = set()  # Avoid duplicates
             
+            # Keywords to EXCLUDE - these are not relevant stores
+            exclude_keywords = [
+                "fruit", "vegetable", "flower", "fish", "meat", "chicken", "mutton",
+                "market jn", "market junction", "bus stop", "bus stand", "railway",
+                "restaurant", "hotel", "cafe", "food court", "biryani", "dosa",
+                "temple", "church", "mosque", "school", "college", "hospital",
+                "bank", "atm", "petrol", "gas station", "parking",
+                "boutique", "saree", "textile", "garment", "fashion",  # Unless searching for clothes
+                "jewel", "gold",  # Unless searching for jewelry
+                "mobile", "phone",  # Unless searching for phones
+            ]
+            
+            # Get the search category to allow relevant stores
+            search_category = shop_regex.lower()
+            
             for element in data.get("elements", []):
                 tags = element.get("tags", {})
                 name = tags.get("name")
@@ -1349,6 +1364,24 @@ out body {max_results};'''
                 # Skip elements without names or duplicates
                 if not name or name in seen_names:
                     continue
+                
+                name_lower = name.lower()
+                shop_type = tags.get("shop", "").lower()
+                
+                # Skip stores that don't match the search category
+                should_skip = False
+                for exclude in exclude_keywords:
+                    if exclude in name_lower:
+                        # Allow if it matches the search category
+                        if exclude in search_category or shop_type in search_category:
+                            continue
+                        should_skip = True
+                        break
+                
+                if should_skip:
+                    logger.debug(f"Skipping irrelevant store: {name}")
+                    continue
+                    
                 seen_names.add(name)
                 
                 # Build address from OSM tags
