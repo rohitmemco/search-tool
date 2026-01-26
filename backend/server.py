@@ -1686,17 +1686,32 @@ async def search_products(request: SearchRequest):
         
         logger.info(f"Location: {location_data}, Currency: {currency_info}")
         
-        # Try to get REAL data from SerpAPI first
-        real_results = await search_with_serpapi(query, location_data["country"], request.max_results, location_data.get("city", ""))
+        # Run both searches in parallel: SerpAPI for online prices + Google Places for local stores
+        serpapi_task = search_with_serpapi(query, location_data["country"], request.max_results, location_data.get("city", ""))
+        places_task = search_local_stores_with_places_api(query, location_data.get("city", ""), 10)
+        
+        real_results, local_stores = await asyncio.gather(serpapi_task, places_task)
+        
+        # Get city name for local stores
+        local_stores_city = None
+        city_info = get_city_from_query(query)
+        if city_info:
+            local_stores_city = city_info.get("name")
+        elif location_data.get("city"):
+            local_stores_city = location_data.get("city").title()
         
         if real_results and len(real_results) > 0:
             # We have real data from Google Shopping!
-            logger.info(f"Using {len(real_results)} REAL results from SerpAPI")
+            logger.info(f"Using {len(real_results)} REAL results from SerpAPI + {len(local_stores)} local stores")
             
             all_results = real_results
             
             # Generate analysis for real data
             analysis = generate_real_data_analysis(all_results, query, location_data, currency_info)
+            
+            # Add local stores info to analysis if available
+            if local_stores and len(local_stores) > 0:
+                analysis += f"\n\n## 📍 Local Stores in {local_stores_city or 'Your Area'}\n\nFound **{len(local_stores)} local stores** near you. Check the 'Local Stores' tab for addresses, phone numbers, and directions."
             
             # Prepare data sources from real results
             data_sources = []
@@ -1712,11 +1727,21 @@ async def search_products(request: SearchRequest):
                         "description": f"Live prices from {source_name}"
                     })
             
+            # Add Google Places as a data source if we have local stores
+            if local_stores:
+                data_sources.append({
+                    "name": "Google Places",
+                    "url": "https://maps.google.com",
+                    "type": "Local Stores",
+                    "description": f"Local stores in {local_stores_city or 'your area'}"
+                })
+            
             # Store search in database
             search_doc = {
                 "id": str(uuid.uuid4()),
                 "query": query,
                 "results_count": len(all_results),
+                "local_stores_count": len(local_stores),
                 "data_source": "serpapi_real",
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
@@ -1734,7 +1759,9 @@ async def search_products(request: SearchRequest):
                 results_count=len(all_results),
                 ai_model="SerpAPI Google Shopping",
                 data_sources=data_sources,
-                available_filters=available_filters
+                available_filters=available_filters,
+                local_stores=local_stores if local_stores else None,
+                local_stores_city=local_stores_city
             )
         
         # Fallback to AI-generated mock data if SerpAPI fails or returns no results
