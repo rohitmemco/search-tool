@@ -1144,17 +1144,19 @@ async def search_local_stores_with_places_api(query: str, city: str = None, max_
         
         logger.info(f"OpenStreetMap search: categories={shop_categories} in area '{osm_area}'")
         
-        # Build Overpass API query - includes retail shops, factories, wholesale, manufacturing
+        # Build Overpass API query - prioritizes retail shops, then factories, manufacturing
         shop_regex = shop_categories['shop']
         
+        # First query: Get actual shops (priority)
         overpass_query = f'''[out:json][timeout:25];
 area["name"="{osm_area}"]->.searchArea;
 (
   node["shop"~"{shop_regex}"](area.searchArea);
   way["shop"~"{shop_regex}"](area.searchArea);
   node["shop"="wholesale"](area.searchArea);
-  node["industrial"]["name"](area.searchArea);
-  node["office"]["name"](area.searchArea);
+  node["shop"="mall"](area.searchArea);
+  node["amenity"="marketplace"](area.searchArea);
+  node["industrial"~"electronics|factory|warehouse"]["name"](area.searchArea);
 );
 out body {max_results};'''
         
