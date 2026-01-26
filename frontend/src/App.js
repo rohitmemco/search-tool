@@ -2183,8 +2183,9 @@ const SearchPage = () => {
 
               {/* Tabs for different views */}
               <Tabs defaultValue="products" className="mb-8">
-                <TabsList className="grid w-full grid-cols-6 max-w-2xl dark:bg-slate-800">
+                <TabsList className="grid w-full grid-cols-7 max-w-3xl dark:bg-slate-800">
                   <TabsTrigger value="products" data-testid="tab-products">Products</TabsTrigger>
+                  <TabsTrigger value="local" data-testid="tab-local">Local Stores</TabsTrigger>
                   <TabsTrigger value="vendors" data-testid="tab-vendors">Vendors</TabsTrigger>
                   <TabsTrigger value="charts" data-testid="tab-charts">Charts</TabsTrigger>
                   <TabsTrigger value="distribution" data-testid="tab-distribution">Distribution</TabsTrigger>
@@ -2209,6 +2210,10 @@ const SearchPage = () => {
                       />
                     ))}
                   </div>
+                </TabsContent>
+
+                <TabsContent value="local" className="mt-6">
+                  <LocalStoresSection localStores={searchResults.local_stores} city={searchResults.local_stores_city} />
                 </TabsContent>
 
                 <TabsContent value="vendors" className="mt-6">
