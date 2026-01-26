@@ -1530,18 +1530,30 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
     """
     query_lower = query.lower()
     
-    # Remove common words to get product keywords
-    stop_words = ['price', 'in', 'at', 'the', 'a', 'an', 'for', 'of', 'to', 'and', 'or', 'best', 'cheap', 'buy', 'shop', 'store', 'near', 'me', 'online']
+    # Remove common words AND city names to get product keywords
+    stop_words = ['price', 'in', 'at', 'the', 'a', 'an', 'for', 'of', 'to', 'and', 'or', 'best', 'cheap', 'buy', 'shop', 'store', 'near', 'me', 'online', 'cost', 'rate', 'rates']
+    
+    # Get all city names to exclude
+    city_names = list(CITY_COORDINATES.keys())
+    
     words = query_lower.split()
-    product_keywords = [w for w in words if w not in stop_words and len(w) > 2]
+    product_keywords = []
+    for w in words:
+        if w in stop_words or len(w) <= 2:
+            continue
+        # Skip if it's a city name
+        is_city = False
+        for city in city_names:
+            if w in city or city in w:
+                is_city = True
+                break
+        if not is_city:
+            product_keywords.append(w)
     
     # Build dynamic search terms
     search_terms = []
     
     for keyword in product_keywords:
-        # Add the keyword itself
-        search_terms.append(keyword)
-        
         # Add related shop types based on keyword
         keyword_to_shop = {
             # Electronics
@@ -1553,7 +1565,7 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
             "computer": "computer|electronics",
             "tv": "electronics",
             "television": "electronics",
-            "camera": "electronics",
+            "camera": "electronics|photo",
             "electronics": "electronics",
             
             # Home & Construction
@@ -1561,7 +1573,8 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
             "faucet": "bathroom_furnishing|plumber",
             "tile": "tiles|bathroom_furnishing|flooring",
             "tiles": "tiles|bathroom_furnishing|flooring",
-            "mirror": "glaziery|glass|interior_decoration|frame",
+            "mirror": "glaziery|glass|interior_decoration|frame|optician",
+            "mirrors": "glaziery|glass|interior_decoration|frame|optician",
             "glass": "glaziery|glass",
             "paint": "paint",
             "brick": "building_materials|hardware",
@@ -1589,22 +1602,29 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
             "dress": "clothes|boutique",
             "saree": "clothes|boutique",
             "shoe": "shoes",
+            "shoes": "shoes",
             "footwear": "shoes",
             "jewellery": "jewelry|jewellery",
             "jewelry": "jewelry|jewellery",
             "gold": "jewelry|jewellery",
             "watch": "watches",
+            "watches": "watches",
             
             # Others
             "grocery": "supermarket|grocery",
             "medicine": "pharmacy",
+            "medical": "pharmacy|medical_supply",
             "book": "books",
+            "books": "books",
             "sport": "sports",
+            "sports": "sports",
             "toy": "toys",
+            "toys": "toys",
             "car": "car|car_parts",
             "bike": "bicycle|motorcycle",
             "cycle": "bicycle",
             "tool": "hardware|tools",
+            "tools": "hardware|tools",
             "hardware": "hardware|doityourself",
         }
         
@@ -1617,7 +1637,11 @@ def get_osm_categories_extended(query: str) -> Dict[str, str]:
         unique_terms = list(set('|'.join(search_terms).split('|')))
         return {"shop": '|'.join(unique_terms), "keywords": product_keywords}
     
-    # If no keywords found, return empty
+    # If no shop mapping found but we have keywords, return just keywords for name search
+    if product_keywords:
+        return {"shop": "", "keywords": product_keywords}
+    
+    # If nothing found, return empty
     return {"shop": "", "keywords": []}
 
 def get_osm_shop_category(query: str) -> str:
