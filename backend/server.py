@@ -1389,9 +1389,18 @@ out body {max_results * 2};'''
                 seen_names.add(name)
                 
                 # Check if store name contains any product keyword (high relevance)
+                # Use word boundary matching to avoid false positives like "textiles" matching "tiles"
+                import re
                 is_relevant = False
                 for keyword in product_keywords:
-                    if keyword in name_lower or keyword in shop_type:
+                    # Check if keyword appears as a whole word in the name or shop type
+                    # This prevents "tiles" from matching "textiles"
+                    pattern = r'\b' + re.escape(keyword) + r'\b'
+                    if re.search(pattern, name_lower) or re.search(pattern, shop_type):
+                        is_relevant = True
+                        break
+                    # Also check if shop_type exactly matches a mapped category
+                    if keyword in shop_type.split('|'):
                         is_relevant = True
                         break
                 
