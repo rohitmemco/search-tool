@@ -2838,20 +2838,39 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 await asyncio.sleep(0.5)
                 
             except Exception as e:
-                logger.error(f"Error processing item {product_info['item']}: {str(e)}")
-                results.append({
-                    "sl_no": product_info['sl_no'],
-                    "item": product_info['item'],
-                    "quantity": product_info.get('quantity', 1),
-                    "min_rate": "Error",
-                    "med_rate": "Error",
-                    "max_rate": "Error",
-                    "min_total": "Error",
-                    "med_total": "Error",
-                    "max_total": "Error",
-                    "website_links": f"Error: {str(e)}",
-                    "vendor_details": "Error"
-                })
+                error_msg = str(e)
+                logger.error(f"Error processing item {product_info['item']}: {error_msg}")
+                
+                # Check if it's a quota error
+                if "quota" in error_msg.lower() or "run out" in error_msg.lower():
+                    # Quota exhausted - return error for all remaining items
+                    results.append({
+                        "sl_no": product_info['sl_no'],
+                        "item": product_info['item'],
+                        "quantity": product_info.get('quantity', 1),
+                        "min_rate": "API Limit",
+                        "med_rate": "API Limit",
+                        "max_rate": "API Limit",
+                        "min_total": "API Limit",
+                        "med_total": "API Limit",
+                        "max_total": "API Limit",
+                        "website_links": "SerpAPI quota exhausted. Please add credits.",
+                        "vendor_details": "API quota exceeded"
+                    })
+                else:
+                    results.append({
+                        "sl_no": product_info['sl_no'],
+                        "item": product_info['item'],
+                        "quantity": product_info.get('quantity', 1),
+                        "min_rate": "Error",
+                        "med_rate": "Error",
+                        "max_rate": "Error",
+                        "min_total": "Error",
+                        "med_total": "Error",
+                        "max_total": "Error",
+                        "website_links": f"Error: {error_msg}",
+                        "vendor_details": "Error"
+                    })
         
         # Generate output Excel with quantity-wise columns
         output_workbook = Workbook()
