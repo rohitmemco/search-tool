@@ -2435,6 +2435,7 @@ const SearchPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <BulkUploadExcel />
                 <FavoritesPanel favorites={favorites} onRemove={removeFavorite} onSearch={handleExampleClick} selectedCurrency={selectedCurrency} />
                 <CurrencySwitcher selectedCurrency={selectedCurrency} onCurrencyChange={setSelectedCurrency} />
                 <DarkModeToggle isDark={isDark} onToggle={() => setIsDark(!isDark)} />
