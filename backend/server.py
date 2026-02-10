@@ -2335,26 +2335,41 @@ def extract_price_from_text(text: str) -> float:
     """Extract price from text containing INR/Rs prices"""
     import re
     
-    # Patterns to match Indian prices
+    # Patterns to match Indian prices (more comprehensive)
     patterns = [
         r'₹\s*([\d,]+(?:\.\d{2})?)',  # ₹1,234 or ₹1,234.00
         r'Rs\.?\s*([\d,]+(?:\.\d{2})?)',  # Rs.1,234 or Rs 1234
         r'INR\s*([\d,]+(?:\.\d{2})?)',  # INR 1,234
-        r'(?:Price|MRP|Cost)[\s:]*₹?\s*([\d,]+(?:\.\d{2})?)',  # Price: 1234
+        r'(?:Price|MRP|Cost|Starts?\s*(?:at|from)?|Only)[\s:]*[₹Rs\.]*\s*([\d,]+(?:\.\d{2})?)',  # Price: 1234
         r'([\d,]+)\s*(?:rupees|rs|inr)',  # 1234 rupees
+        r'(?:starting\s*)?(?:at\s*)?₹?\s*(\d{2,3}),?(\d{3})',  # 74,999 or 74999
+        r'(\d{4,7})\s*(?:₹|Rs|INR)?',  # Standalone numbers like 74999
     ]
     
+    all_prices = []
+    
     for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            price_str = match.group(1).replace(',', '')
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
             try:
+                if match.lastindex and match.lastindex >= 2:
+                    # Handle patterns with multiple groups (like 74,999)
+                    price_str = match.group(1) + match.group(2)
+                else:
+                    price_str = match.group(1).replace(',', '')
+                
                 price = float(price_str)
-                # Validate price is reasonable (between 10 and 10 million INR)
-                if 10 <= price <= 10000000:
-                    return price
-            except ValueError:
+                # Validate price is reasonable (between 100 and 10 million INR)
+                if 100 <= price <= 10000000:
+                    all_prices.append(price)
+            except (ValueError, IndexError):
                 continue
+    
+    # Return the most reasonable price (prefer prices in typical ranges)
+    if all_prices:
+        # Sort and return the first reasonable price
+        all_prices.sort()
+        return all_prices[0]
     
     return 0
 
