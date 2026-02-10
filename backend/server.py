@@ -2146,22 +2146,9 @@ def calculate_min_med_max_from_real_prices(validated_prices: List[Dict]) -> Dict
         'all_sources': all_sources,
         'price_count': len(validated_prices)
     }
-                    
-    except Exception as e:
-        logger.error(f"Free web search error: {e}")
-    
-    # Remove duplicates
-    seen = set()
-    unique_products = []
-    for p in products:
-        key = (p['price'], p['source'])
-        if key not in seen:
-            seen.add(key)
-            unique_products.append(p)
-    
-    logger.info(f"Free web search returned {len(unique_products)} products for: {query}")
-    return unique_products
 
+
+# Fallback function for when web search returns no results
 def generate_estimated_prices(query: str) -> List[Dict]:
     """
     Generate estimated market prices based on product category.
