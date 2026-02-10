@@ -2018,24 +2018,24 @@ def generate_estimated_prices(query: str) -> List[Dict]:
         'tiles': (55, 110, 200),
         'dado': (90, 145, 240),  # per sq ft
         'wall dado': (90, 145, 240),
-        'flooring': (60, 150, 400),  # per sq ft
+        'flooring': (70, 140, 250),  # per sq ft
         
         # Kitchen Cabinets & Furniture
-        'cabinet': (15000, 35000, 100000),
-        'modular': (25000, 60000, 200000),
-        'base unit': (8000, 20000, 50000),
-        'wall unit': (6000, 15000, 40000),
-        'shutter': (3000, 8000, 20000),
+        'cabinet': (18000, 32000, 52000),
+        'modular': (28000, 55000, 95000),
+        'base unit': (10000, 18000, 30000),
+        'wall unit': (8000, 14000, 24000),
+        'shutter': (4000, 8000, 14000),
         
         # Hardware
-        'hardware': (500, 2500, 10000),
-        'drawer': (1200, 3500, 12000),
-        'drawer channel': (400, 900, 2500),
-        'hinge': (150, 400, 1200),
-        'handle': (200, 600, 2000),
+        'hardware': (600, 2200, 5000),
+        'drawer': (1500, 3200, 6500),
+        'drawer channel': (500, 850, 1500),
+        'hinge': (180, 380, 700),
+        'handle': (250, 550, 1000),
         
         # Default for unknown items
-        'default': (2000, 8000, 30000)
+        'default': (3000, 8000, 15000)
     }
     
     # Find best matching price range
