@@ -1898,47 +1898,67 @@ def generate_estimated_prices(query: str) -> List[Dict]:
     """
     query_lower = query.lower()
     
-    # Price ranges for common products (min, typical, max)
+    # Price ranges for common products (min, typical, max) in INR
     price_ranges = {
-        # Kitchen Items
+        # Kitchen Appliances (full unit prices)
         'sink': (5000, 15000, 50000),
         'kitchen sink': (5000, 15000, 50000),
-        'carysil': (8000, 20000, 60000),
-        'franke': (10000, 25000, 80000),
-        'refrigerator': (15000, 35000, 150000),
-        'fridge': (15000, 35000, 150000),
-        'bosch': (20000, 50000, 200000),
-        'chimney': (8000, 20000, 60000),
-        'hob': (10000, 25000, 80000),
-        'microwave': (5000, 15000, 50000),
-        'dishwasher': (25000, 45000, 100000),
+        'carysil': (8000, 25000, 75000),
+        'franke': (12000, 35000, 100000),
+        'refrigerator': (18000, 40000, 180000),
+        'fridge': (18000, 40000, 180000),
+        'bosch refrigerator': (25000, 55000, 200000),
+        'bosch': (25000, 55000, 200000),
+        'lg': (20000, 45000, 150000),
+        'samsung': (22000, 50000, 180000),
+        'chimney': (8000, 22000, 70000),
+        'hob': (12000, 28000, 90000),
+        'microwave': (6000, 18000, 55000),
+        'dishwasher': (30000, 55000, 120000),
+        'oven': (15000, 35000, 100000),
+        'water purifier': (8000, 18000, 45000),
         
-        # Construction Materials
-        'plywood': (50, 150, 400),  # per sq ft
-        'ply': (50, 150, 400),
-        'laminate': (30, 80, 200),  # per sq ft
-        'quartz': (200, 400, 1000),  # per sq ft
-        'granite': (100, 250, 600),  # per sq ft
-        'marble': (150, 350, 800),  # per sq ft
-        'counter': (200, 400, 1000),  # per sq ft
-        'tile': (40, 100, 300),  # per sq ft
-        'dado': (60, 120, 250),  # per sq ft
+        # Construction Materials (per unit/sq ft - these are typically multiplied)
+        'plywood': (80, 180, 450),  # per sq ft
+        'ply': (80, 180, 450),
+        'bwp': (100, 200, 500),  # BWP plywood per sq ft
+        'laminate': (40, 100, 280),  # per sq ft
+        'quartz': (250, 500, 1200),  # per sq ft
+        'quartz stone': (250, 500, 1200),
+        'granite': (120, 300, 750),  # per sq ft
+        'marble': (180, 450, 1000),  # per sq ft
+        'counter top': (300, 600, 1500),  # per sq ft for fabricated
+        'countertop': (300, 600, 1500),
+        'tile': (45, 120, 350),  # per sq ft
+        'tiles': (45, 120, 350),
+        'dado': (80, 150, 350),  # per sq ft
+        'wall dado': (80, 150, 350),
+        'flooring': (60, 150, 400),  # per sq ft
+        
+        # Kitchen Cabinets & Furniture
+        'cabinet': (15000, 35000, 100000),
+        'modular': (25000, 60000, 200000),
+        'base unit': (8000, 20000, 50000),
+        'wall unit': (6000, 15000, 40000),
+        'shutter': (3000, 8000, 20000),
         
         # Hardware
-        'hardware': (500, 2000, 8000),
-        'drawer': (800, 2500, 8000),
-        'hinge': (100, 300, 800),
-        'channel': (200, 500, 1500),
+        'hardware': (500, 2500, 10000),
+        'drawer': (1200, 3500, 12000),
+        'drawer channel': (400, 900, 2500),
+        'hinge': (150, 400, 1200),
+        'handle': (200, 600, 2000),
         
-        # Default
-        'default': (1000, 5000, 20000)
+        # Default for unknown items
+        'default': (2000, 8000, 30000)
     }
     
-    # Find matching price range
+    # Find best matching price range
     min_price, typical_price, max_price = price_ranges.get('default')
     matched_category = 'default'
     
-    for keyword, prices in price_ranges.items():
+    # Check for multi-word matches first (more specific)
+    for keyword, prices in sorted(price_ranges.items(), key=lambda x: -len(x[0])):
         if keyword in query_lower:
             min_price, typical_price, max_price = prices
             matched_category = keyword
@@ -1947,27 +1967,27 @@ def generate_estimated_prices(query: str) -> List[Dict]:
     # Generate realistic price variations
     products = []
     
-    # Add a few realistic price points
+    # Add price points with realistic variations
     variations = [
-        (min_price, 'Budget Option'),
-        (int(min_price * 1.3), 'Economy'),
-        (typical_price, 'Standard'),
-        (int(typical_price * 1.2), 'Premium'),
-        (max_price, 'High-End'),
+        (min_price, 'Budget/Economy'),
+        (int(min_price + (typical_price - min_price) * 0.5), 'Standard'),
+        (typical_price, 'Mid-Range'),
+        (int(typical_price + (max_price - typical_price) * 0.5), 'Premium'),
+        (max_price, 'High-End/Branded'),
     ]
     
-    vendors = ['IndiaMart', 'TradeIndia', 'Amazon', 'Flipkart', 'Local Market']
+    vendors = ['IndiaMart', 'TradeIndia', 'Amazon', 'Flipkart', 'Local Dealer']
     
     for i, (price, quality) in enumerate(variations):
         if price > 0:
             products.append({
                 'name': f"{query} - {quality}",
-                'price': price,
+                'price': float(price),
                 'currency_symbol': '₹',
                 'currency_code': 'INR',
                 'source': vendors[i % len(vendors)],
                 'source_url': f"https://www.indiamart.com/search.html?ss={quote_plus(query)}",
-                'description': f"Estimated market price for {matched_category}"
+                'description': f"Estimated market price ({matched_category} category)"
             })
     
     return products
