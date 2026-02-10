@@ -1174,9 +1174,16 @@ const BulkUploadExcel = () => {
           {/* Format Info */}
           <div className="text-xs text-slate-500 space-y-1">
             <p className="font-medium text-slate-700 dark:text-slate-300">Excel Format:</p>
-            <p>• Column A: Product Name (required)</p>
-            <p>• Column B: Location/City (optional)</p>
+            <p>• Column A: SL No (Serial Number)</p>
+            <p>• Column B: Item (Product Name)</p>
             <p>• Start data from Row 2 (Row 1 is header)</p>
+          </div>
+
+          {/* Output Info */}
+          <div className="text-xs text-slate-500 space-y-1 border-t pt-3 mt-3">
+            <p className="font-medium text-slate-700 dark:text-slate-300">Output Columns:</p>
+            <p>• SL No, Item, Min Rate, Medium Rate, Max Rate</p>
+            <p>• Website Links, Vendor Details</p>
           </div>
         </div>
       </DialogContent>
