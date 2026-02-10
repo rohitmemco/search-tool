@@ -2670,9 +2670,6 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         "website_links": "No results found",
                         "vendor_details": "No results found"
                     })
-                        "website_links": "No results found",
-                        "vendor_details": "No results found"
-                    })
                 
                 # Small delay to avoid rate limiting
                 await asyncio.sleep(0.5)
@@ -2682,14 +2679,18 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 results.append({
                     "sl_no": product_info['sl_no'],
                     "item": product_info['item'],
+                    "quantity": product_info.get('quantity', 1),
                     "min_rate": "Error",
                     "med_rate": "Error",
                     "max_rate": "Error",
+                    "min_total": "Error",
+                    "med_total": "Error",
+                    "max_total": "Error",
                     "website_links": f"Error: {str(e)}",
                     "vendor_details": "Error"
                 })
         
-        # Generate output Excel with ONLY required columns
+        # Generate output Excel with quantity-wise columns
         output_workbook = Workbook()
         output_sheet = output_workbook.active
         output_sheet.title = "Price Results"
@@ -2705,9 +2706,11 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             bottom=Side(style='thin')
         )
         
-        # Write headers - ONLY required columns
+        # Write headers - including Quantity and Total columns
         headers = [
-            "SL No", "Item", "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)", 
+            "SL No", "Item", "Quantity", 
+            "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)", 
+            "Min Total (₹)", "Medium Total (₹)", "Max Total (₹)",
             "Website Links", "Vendor Details"
         ]
         
@@ -2723,9 +2726,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             data = [
                 result['sl_no'],
                 result['item'],
+                result['quantity'],
                 result['min_rate'],
                 result['med_rate'],
                 result['max_rate'],
+                result['min_total'],
+                result['med_total'],
+                result['max_total'],
                 result['website_links'],
                 result['vendor_details']
             ]
