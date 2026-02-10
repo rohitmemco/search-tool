@@ -3198,6 +3198,8 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         "min_total": "N/A",
                         "med_total": "N/A",
                         "max_total": "N/A",
+                        "rate_diff": "N/A",
+                        "amount_diff": "N/A",
                         "website_links": "No results found",
                         "vendor_details": "No results found"
                     })
@@ -3209,45 +3211,32 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 error_msg = str(e)
                 logger.error(f"Error processing item {product_info['item']}: {error_msg}")
                 
-                # Check if it's a quota error
-                if "quota" in error_msg.lower() or "run out" in error_msg.lower():
-                    # Quota exhausted - return error for all remaining items
-                    results.append({
-                        "sl_no": product_info['sl_no'],
-                        "item": product_info['item'],
-                        "quantity": product_info.get('quantity', 1),
-                        "min_rate": "API Limit",
-                        "med_rate": "API Limit",
-                        "max_rate": "API Limit",
-                        "min_total": "API Limit",
-                        "med_total": "API Limit",
-                        "max_total": "API Limit",
-                        "website_links": "SerpAPI quota exhausted. Please add credits.",
-                        "vendor_details": "API quota exceeded"
-                    })
-                else:
-                    results.append({
-                        "sl_no": product_info['sl_no'],
-                        "item": product_info['item'],
-                        "quantity": product_info.get('quantity', 1),
-                        "min_rate": "Error",
-                        "med_rate": "Error",
-                        "max_rate": "Error",
-                        "min_total": "Error",
-                        "med_total": "Error",
-                        "max_total": "Error",
-                        "website_links": f"Error: {error_msg}",
-                        "vendor_details": "Error"
-                    })
+                results.append({
+                    "sl_no": product_info['sl_no'],
+                    "item": product_info['item'],
+                    "user_rate": product_info.get('user_rate', 0),
+                    "quantity": product_info.get('quantity', 1),
+                    "user_amount": product_info.get('user_amount', 0),
+                    "min_rate": "Error",
+                    "med_rate": "Error",
+                    "max_rate": "Error",
+                    "min_total": "Error",
+                    "med_total": "Error",
+                    "max_total": "Error",
+                    "rate_diff": "Error",
+                    "amount_diff": "Error",
+                    "website_links": f"Error: {error_msg}",
+                    "vendor_details": "Error"
+                })
         
-        # Generate output Excel with quantity-wise columns
+        # Generate output Excel with comparison columns
         output_workbook = Workbook()
         output_sheet = output_workbook.active
-        output_sheet.title = "Price Results"
+        output_sheet.title = "Price Comparison"
         
         # Define styles
         header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="4A90D9", end_color="4A90D9", fill_type="solid")
+        header_fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
         header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         thin_border = Border(
             left=Side(style='thin'),
@@ -3256,8 +3245,11 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             bottom=Side(style='thin')
         )
         
-        # Write headers - including Quantity and Total columns
-        headers = [
+        # Colors for comparison highlighting
+        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Good deal - paying less
+        red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")    # Overpaying
+        green_font = Font(color="006100")
+        red_font = Font(color="9C0006")
             "SL No", "Item", "Quantity", 
             "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)", 
             "Min Total (₹)", "Medium Total (₹)", "Max Total (₹)",
