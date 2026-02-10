@@ -3592,7 +3592,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         
         # Comparison / Savings section
         comparison_row = summary_row + 8
-        output_sheet.merge_cells(f'A{comparison_row}:K{comparison_row}')
+        output_sheet.merge_cells(f'A{comparison_row}:M{comparison_row}')
         if savings_vs_min > 0:
             comparison_text = f"COMPARISON: Your Grand Total (₹{your_grand_total:,}) is ₹{savings_vs_min:,} MORE than Market Minimum (₹{min_grand_total:,}) - OVERPAYING"
             comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
@@ -3614,15 +3614,15 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         legend_row = comparison_row + 3
         output_sheet.cell(row=legend_row, column=1, value="Legend:").font = Font(bold=True)
         
-        legend_green = output_sheet.cell(row=legend_row + 1, column=1, value="Green = Good Deal (Your rate is LOWER than market minimum)")
+        legend_green = output_sheet.cell(row=legend_row + 1, column=1, value="Green = Good Deal (Your rate is LOWER than market rate)")
         legend_green.fill = green_fill
         legend_green.font = green_font
         
-        legend_red = output_sheet.cell(row=legend_row + 2, column=1, value="Red = Overpaying (Your rate is HIGHER than market minimum)")
+        legend_red = output_sheet.cell(row=legend_row + 2, column=1, value="Red = Overpaying (Your rate is HIGHER than market rate)")
         legend_red.fill = red_fill
         legend_red.font = red_font
         
-        output_sheet.cell(row=legend_row + 4, column=1, value="Note: Rate Diff and Amount Diff are calculated against Market MINIMUM rates.").font = Font(italic=True)
+        output_sheet.cell(row=legend_row + 4, column=1, value="Note: Rate Diff and Amount Diff columns show comparison for each rate type (Min, Med, Max).").font = Font(italic=True)
         
         # Save to BytesIO
         output_buffer = io.BytesIO()
