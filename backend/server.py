@@ -1797,6 +1797,180 @@ def extract_product_type(item_name: str) -> str:
     words = cleaned.split()[:4]
     return ' '.join(words)
 
+# ================== FREE WEB SEARCH (No API Key Required) ==================
+async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
+    """
+    Free web search for product prices using DuckDuckGo and price extraction.
+    No API key required - uses web scraping.
+    """
+    products = []
+    
+    # Headers to mimic a browser
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            # Search using DuckDuckGo HTML (no API needed)
+            search_query = f"{query} price INR buy india"
+            encoded_query = quote_plus(search_query)
+            
+            # Try DuckDuckGo HTML search
+            ddg_url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
+            
+            try:
+                response = await client.get(ddg_url, headers=headers)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'lxml')
+                    
+                    # Parse DuckDuckGo results
+                    results = soup.find_all('div', class_='result')
+                    
+                    for result in results[:max_results]:
+                        try:
+                            # Get title and link
+                            title_elem = result.find('a', class_='result__a')
+                            snippet_elem = result.find('a', class_='result__snippet')
+                            
+                            if title_elem:
+                                title = title_elem.get_text(strip=True)
+                                link = title_elem.get('href', '')
+                                snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                                
+                                # Extract price from title or snippet
+                                price = extract_price_from_text(title + ' ' + snippet)
+                                
+                                # Try to identify vendor from URL
+                                vendor = extract_vendor_from_url(link)
+                                
+                                if price and price > 0:
+                                    products.append({
+                                        'name': title[:100],
+                                        'price': price,
+                                        'currency_symbol': '₹',
+                                        'currency_code': 'INR',
+                                        'source': vendor,
+                                        'source_url': link,
+                                        'description': snippet[:200] if snippet else ''
+                                    })
+                        except Exception as e:
+                            continue
+                            
+            except Exception as e:
+                logger.warning(f"DuckDuckGo search failed: {e}")
+            
+            # Also try Google search (may be rate limited)
+            if len(products) < 5:
+                google_url = f"https://www.google.com/search?q={encoded_query}&num=20"
+                try:
+                    response = await client.get(google_url, headers=headers)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'lxml')
+                        
+                        # Parse Google results
+                        for g in soup.find_all('div', class_='g')[:max_results]:
+                            try:
+                                title_elem = g.find('h3')
+                                link_elem = g.find('a')
+                                snippet_elem = g.find('div', class_='VwiC3b')
+                                
+                                if title_elem and link_elem:
+                                    title = title_elem.get_text(strip=True)
+                                    link = link_elem.get('href', '')
+                                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                                    
+                                    price = extract_price_from_text(title + ' ' + snippet)
+                                    vendor = extract_vendor_from_url(link)
+                                    
+                                    if price and price > 0:
+                                        products.append({
+                                            'name': title[:100],
+                                            'price': price,
+                                            'currency_symbol': '₹',
+                                            'currency_code': 'INR',
+                                            'source': vendor,
+                                            'source_url': link,
+                                            'description': snippet[:200] if snippet else ''
+                                        })
+                            except:
+                                continue
+                except Exception as e:
+                    logger.warning(f"Google search failed: {e}")
+                    
+    except Exception as e:
+        logger.error(f"Free web search error: {e}")
+    
+    logger.info(f"Free web search returned {len(products)} products for: {query}")
+    return products
+
+def extract_price_from_text(text: str) -> float:
+    """Extract price from text containing INR/Rs prices"""
+    import re
+    
+    # Patterns to match Indian prices
+    patterns = [
+        r'₹\s*([\d,]+(?:\.\d{2})?)',  # ₹1,234 or ₹1,234.00
+        r'Rs\.?\s*([\d,]+(?:\.\d{2})?)',  # Rs.1,234 or Rs 1234
+        r'INR\s*([\d,]+(?:\.\d{2})?)',  # INR 1,234
+        r'(?:Price|MRP|Cost)[\s:]*₹?\s*([\d,]+(?:\.\d{2})?)',  # Price: 1234
+        r'([\d,]+)\s*(?:rupees|rs|inr)',  # 1234 rupees
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            price_str = match.group(1).replace(',', '')
+            try:
+                price = float(price_str)
+                # Validate price is reasonable (between 10 and 10 million INR)
+                if 10 <= price <= 10000000:
+                    return price
+            except ValueError:
+                continue
+    
+    return 0
+
+def extract_vendor_from_url(url: str) -> str:
+    """Extract vendor name from URL"""
+    from urllib.parse import urlparse
+    
+    vendor_mappings = {
+        'amazon': 'Amazon',
+        'flipkart': 'Flipkart',
+        'myntra': 'Myntra',
+        'snapdeal': 'Snapdeal',
+        'paytmmall': 'Paytm Mall',
+        'tatacliq': 'Tata CLiQ',
+        'reliancedigital': 'Reliance Digital',
+        'croma': 'Croma',
+        'vijaysales': 'Vijay Sales',
+        'industrybuying': 'IndustryBuying',
+        'indiamart': 'IndiaMart',
+        'tradeindia': 'TradeIndia',
+        'justdial': 'JustDial',
+        'moglix': 'Moglix',
+        'buildingmaterials': 'Building Materials',
+        'buildersmart': 'BuildersMart',
+        'materialtree': 'MaterialTree',
+        'pepperfry': 'Pepperfry',
+        'urban': 'Urban Ladder',
+        'godrej': 'Godrej',
+        'ikea': 'IKEA',
+    }
+    
+    try:
+        domain = urlparse(url).netloc.lower()
+        for key, vendor in vendor_mappings.items():
+            if key in domain:
+                return vendor
+        # Return domain name if no mapping found
+        return domain.replace('www.', '').split('.')[0].title()
+    except:
+        return 'Unknown'
+
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
     """
