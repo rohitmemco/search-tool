@@ -1,0 +1,127 @@
+{
+  "summary": "Bulk Excel Upload with Rate Diff and Amount Diff columns for ALL rate types (Min, Med, Max) tested successfully. All 15 tests passed. Verified: 19 output columns, Rate Diff and Amount Diff for Min/Med/Max, correct diff calculations, color highlighting (red=overpaying, green=good deal), consolidated GST summary with FOUR sections.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "POST /api/bulk-search/upload returns 200 OK",
+    "Output Excel has 19 columns",
+    "Column names correct: SL No, Item, Your Rate (₹), Qty, Your Amount (₹), Min Rate (₹), Min Amount (₹), Rate Diff (Min) (₹), Amount Diff (Min) (₹), Med Rate (₹), Med Amount (₹), Rate Diff (Med) (₹), Amount Diff (Med) (₹), Max Rate (₹), Max Amount (₹), Rate Diff (Max) (₹), Amount Diff (Max) (₹), Website Links, Vendor Details",
+    "Rate Diff (Min) = Your Rate - Min Rate (verified: 75000 - 65000 = 10000)",
+    "Amount Diff (Min) = Your Amount - Min Amount (verified: 75000 - 65000 = 10000)",
+    "Rate Diff (Med) = Your Rate - Med Rate (verified: 75000 - 75000 = 0)",
+    "Amount Diff (Med) = Your Amount - Med Amount (verified: 75000 - 75000 = 0)",
+    "Rate Diff (Max) = Your Rate - Max Rate (verified: 75000 - 90000 = -15000)",
+    "Amount Diff (Max) = Your Amount - Max Amount (verified: 75000 - 90000 = -15000)",
+    "Positive diffs (overpaying) highlighted RED: 6 cells verified",
+    "Negative diffs (good deal) highlighted GREEN: 8 cells verified",
+    "Consolidated GST Summary has FOUR sections: YOUR PRICING, MARKET MINIMUM, MARKET MEDIUM, MARKET MAXIMUM",
+    "Found 'CONSOLIDATED GST SUMMARY' header",
+    "All GST line items present: Taxable Amount, CGST, SGST, Round Off, Grand Total",
+    "All diff calculations correct for all 3 test products"
+  ],
+
+  "verified_calculations": {
+    "samsung_galaxy_s24": {
+      "your_rate": 75000,
+      "min_rate": 65000,
+      "med_rate": 75000,
+      "max_rate": 90000,
+      "rate_diff_min": "75000 - 65000 = +10000 (overpaying, RED)",
+      "rate_diff_med": "75000 - 75000 = 0 (neutral)",
+      "rate_diff_max": "75000 - 90000 = -15000 (good deal, GREEN)"
+    },
+    "macbook_air_m3": {
+      "your_rate": 120000,
+      "min_rate": 100000,
+      "med_rate": 115000,
+      "max_rate": 140000,
+      "rate_diff_min": "120000 - 100000 = +20000 (overpaying, RED)",
+      "rate_diff_med": "120000 - 115000 = +5000 (overpaying, RED)",
+      "rate_diff_max": "120000 - 140000 = -20000 (good deal, GREEN)"
+    },
+    "sony_wh1000xm5": {
+      "your_rate": 25000,
+      "min_rate": 25000,
+      "med_rate": 30000,
+      "max_rate": 35000,
+      "rate_diff_min": "25000 - 25000 = 0 (neutral)",
+      "rate_diff_med": "25000 - 30000 = -5000 (good deal, GREEN)",
+      "rate_diff_max": "25000 - 35000 = -10000 (good deal, GREEN)"
+    }
+  },
+
+  "output_excel_columns": [
+    "SL No",
+    "Item",
+    "Your Rate (₹)",
+    "Qty",
+    "Your Amount (₹)",
+    "Min Rate (₹)",
+    "Min Amount (₹)",
+    "Rate Diff (Min) (₹)",
+    "Amount Diff (Min) (₹)",
+    "Med Rate (₹)",
+    "Med Amount (₹)",
+    "Rate Diff (Med) (₹)",
+    "Amount Diff (Med) (₹)",
+    "Max Rate (₹)",
+    "Max Amount (₹)",
+    "Rate Diff (Max) (₹)",
+    "Amount Diff (Max) (₹)",
+    "Website Links",
+    "Vendor Details"
+  ],
+
+  "consolidated_summary_structure": {
+    "header": "CONSOLIDATED GST SUMMARY",
+    "four_sections": ["YOUR PRICING", "MARKET MINIMUM", "MARKET MEDIUM", "MARKET MAXIMUM"],
+    "line_items_per_section": ["Taxable Amount", "CGST @ 9.0%", "SGST @ 9.0%", "Round Off", "Grand Total"],
+    "color_legend": ["Green = Good Deal (negative diff)", "Red = Overpaying (positive diff)"],
+    "note": "Rate Diff and Amount Diff are calculated against each rate type (Min, Med, Max)"
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_bulk_upload_all_diffs.py",
+    "/app/test_reports/pytest/pytest_bulk_upload_all_diffs.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "New 19-column format correctly implemented with Rate Diff and Amount Diff for Min, Med, Max",
+    "Diff calculations correct: Your Rate/Amount - Min/Med/Max Rate/Amount",
+    "Color highlighting working: RED for positive diffs (overpaying), GREEN for negative diffs (good deal)",
+    "Consolidated GST summary has all FOUR required sections",
+    "Market prices are realistic estimates (SerpAPI MOCKED/exhausted)"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_bulk_upload_all_diffs.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)"
+  },
+
+  "seed_data_creation": "Test Excel files created dynamically during tests with Samsung Galaxy S24 (Your Rate ₹75K), MacBook Air M3 (Your Rate ₹120K), Sony WH-1000XM5 (Your Rate ₹25K)",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Bulk Excel Upload feature fully tested with new 19-column format including Rate Diff and Amount Diff for ALL rate types (Min, Med, Max). Column names are: 'Rate Diff (Min) (₹)', 'Amount Diff (Min) (₹)', 'Rate Diff (Med) (₹)', 'Amount Diff (Med) (₹)', 'Rate Diff (Max) (₹)', 'Amount Diff (Max) (₹)'. Color coding: Positive diffs = RED (overpaying), Negative diffs = GREEN (good deal). Consolidated GST summary has FOUR sections. SerpAPI is MOCKED/exhausted - using estimated market prices.",
+
+  "mocked_apis": {
+    "SerpAPI": "Using estimated market prices as fallback due to API exhaustion - prices are realistic"
+  }
+}
