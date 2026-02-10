@@ -3598,7 +3598,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     })
                 
                 # Small delay to avoid rate limiting
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
                 
             except Exception as e:
                 error_msg = str(e)
