@@ -3159,30 +3159,17 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "vendor_details": ", ".join(vendors[:10])
                         })
                     else:
-                        # No validated prices - still calculate user's GST
-                        user_cgst = user_amount * 0.09
-                        user_sgst = user_amount * 0.09
-                        user_grand_total = user_amount + user_cgst + user_sgst
-                        
+                        # No validated prices
                         results.append({
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
                             "user_rate": round(user_rate, 2),
                             "quantity": quantity,
                             "user_amount": round(user_amount, 2),
-                            "user_cgst": round(user_cgst, 2),
-                            "user_sgst": round(user_sgst, 2),
-                            "user_grand_total": round(user_grand_total, 2),
-                            "min_rate": "N/A",
-                            "med_rate": "N/A",
-                            "max_rate": "N/A",
-                            "med_total": "N/A",
-                            "market_cgst": "N/A",
-                            "market_sgst": "N/A",
-                            "market_grand_total": "N/A",
+                            "market_min_rate": "N/A",
+                            "market_min_total": "N/A",
                             "rate_diff": "N/A",
                             "amount_diff": "N/A",
-                            "grand_total_diff": "N/A",
                             "website_links": "No valid prices found",
                             "vendor_details": "No valid prices found"
                         })
