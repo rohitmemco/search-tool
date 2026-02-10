@@ -1813,82 +1813,339 @@ def extract_product_type(item_name: str) -> str:
     words = cleaned.split()[:4]
     return ' '.join(words)
 
-# ================== FREE WEB SEARCH (No API Key Required) ==================
-async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
+# ================== REAL WEB SEARCH (No Hardcoded Prices) ==================
+async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict]:
     """
-    Free web search for product prices using multiple methods.
-    No API key required.
-    Primary source is estimated prices based on product category,
-    supplemented by web scraping when reliable.
+    Perform real web searches across multiple sources to find actual market prices.
+    NO hardcoded or static prices - all prices come from live web scraping.
+    
+    Returns list of price results with source URLs and vendor names.
     """
     products = []
-    
-    # FIRST: Generate estimated prices based on product category (reliable baseline)
-    estimated = generate_estimated_prices(query)
-    products.extend(estimated)
-    logger.info(f"Generated {len(estimated)} estimated prices for: {query}")
+    search_timestamp = datetime.now().isoformat()
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Language': 'en-IN,en-US;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate',
     }
     
-    try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            search_query = f"{query}"
-            encoded_query = quote_plus(search_query)
+    # Clean query for better search results
+    clean_query = query.strip()
+    encoded_query = quote_plus(f"{clean_query} price india buy")
+    
+    async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+        
+        # Source 1: Bing Search
+        try:
+            bing_url = f"https://www.bing.com/search?q={encoded_query}&count=30"
+            response = await client.get(bing_url, headers=headers)
             
-            # Method 1: Try Bing search (more reliable than DuckDuckGo)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                
+                for result in soup.find_all('li', class_='b_algo')[:max_results]:
+                    try:
+                        link_elem = result.find('a')
+                        if not link_elem:
+                            continue
+                            
+                        title = link_elem.get_text(strip=True)
+                        link = link_elem.get('href', '')
+                        
+                        # Get snippet/description
+                        snippet_elem = result.find('p')
+                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                        
+                        # Also check for price-specific elements
+                        price_elem = result.find(class_=lambda x: x and 'price' in str(x).lower())
+                        price_text = price_elem.get_text(strip=True) if price_elem else ''
+                        
+                        # Combine all text for price extraction
+                        full_text = f"{title} {snippet} {price_text}"
+                        price = extract_price_from_text(full_text)
+                        
+                        if price > 0:
+                            vendor = extract_vendor_from_url(link)
+                            products.append({
+                                'name': title[:150],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': vendor,
+                                'source_url': link,
+                                'description': snippet[:300],
+                                'search_engine': 'Bing',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception as e:
+                        continue
+                        
+            logger.info(f"Bing search found {len(products)} prices for: {query}")
+        except Exception as e:
+            logger.warning(f"Bing search failed: {e}")
+        
+        # Source 2: DuckDuckGo HTML Search
+        try:
+            ddg_url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
+            response = await client.get(ddg_url, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                for result in soup.find_all('div', class_='result')[:20]:
+                    try:
+                        link_elem = result.find('a', class_='result__a')
+                        if not link_elem:
+                            continue
+                            
+                        title = link_elem.get_text(strip=True)
+                        link = link_elem.get('href', '')
+                        
+                        snippet_elem = result.find('a', class_='result__snippet')
+                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                        
+                        full_text = f"{title} {snippet}"
+                        price = extract_price_from_text(full_text)
+                        
+                        if price > 0:
+                            vendor = extract_vendor_from_url(link)
+                            products.append({
+                                'name': title[:150],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': vendor,
+                                'source_url': link,
+                                'description': snippet[:300],
+                                'search_engine': 'DuckDuckGo',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception as e:
+                        continue
+                        
+                logger.info(f"DuckDuckGo found {len(products) - initial_count} additional prices")
+        except Exception as e:
+            logger.warning(f"DuckDuckGo search failed: {e}")
+        
+        # Source 3: Direct e-commerce site searches (Amazon India, Flipkart patterns)
+        ecommerce_queries = [
+            f"site:amazon.in {clean_query} price",
+            f"site:flipkart.com {clean_query} price",
+            f"site:croma.com {clean_query} price",
+            f"site:reliance digital {clean_query} price",
+        ]
+        
+        for eq in ecommerce_queries:
             try:
-                bing_url = f"https://www.bing.com/search?q={encoded_query}+price+india&count=20"
-                response = await client.get(bing_url, headers=headers)
+                eq_encoded = quote_plus(eq)
+                bing_ecom_url = f"https://www.bing.com/search?q={eq_encoded}&count=10"
+                response = await client.get(bing_ecom_url, headers=headers)
                 
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'lxml')
                     
-                    # Calculate expected price range from estimated prices
-                    if estimated:
-                        estimated_min = min(p['price'] for p in estimated)
-                        estimated_max = max(p['price'] for p in estimated)
-                        # Accept web prices within 50% of estimated range
-                        valid_price_min = estimated_min * 0.5
-                        valid_price_max = estimated_max * 2.0
-                    else:
-                        valid_price_min = 100
-                        valid_price_max = 10000000
-                    
-                    # Find all search results
-                    for result in soup.find_all('li', class_='b_algo')[:max_results]:
+                    for result in soup.find_all('li', class_='b_algo')[:10]:
                         try:
                             link_elem = result.find('a')
-                            title = link_elem.get_text(strip=True) if link_elem else ''
-                            link = link_elem.get('href', '') if link_elem else ''
+                            if not link_elem:
+                                continue
+                                
+                            title = link_elem.get_text(strip=True)
+                            link = link_elem.get('href', '')
                             
-                            # Get snippet
                             snippet_elem = result.find('p')
                             snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
                             
-                            # Extract price
-                            full_text = title + ' ' + snippet
+                            full_text = f"{title} {snippet}"
                             price = extract_price_from_text(full_text)
                             
-                            # Only accept prices within valid range (validated against estimates)
-                            if price > 0 and valid_price_min <= price <= valid_price_max:
+                            if price > 0:
                                 vendor = extract_vendor_from_url(link)
                                 products.append({
-                                    'name': title[:100],
+                                    'name': title[:150],
                                     'price': price,
                                     'currency_symbol': '₹',
                                     'currency_code': 'INR',
                                     'source': vendor,
                                     'source_url': link,
-                                    'description': snippet[:200]
+                                    'description': snippet[:300],
+                                    'search_engine': 'Bing-Ecommerce',
+                                    'timestamp': search_timestamp
                                 })
                         except:
                             continue
+                            
+                await asyncio.sleep(0.3)  # Rate limiting
             except Exception as e:
-                logger.warning(f"Bing search failed: {e}")
+                continue
+        
+        # Source 4: Google search via scraping (fallback)
+        try:
+            google_url = f"https://www.google.com/search?q={encoded_query}&num=20&hl=en"
+            google_headers = headers.copy()
+            google_headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            
+            response = await client.get(google_url, headers=google_headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Look for search result divs
+                for result in soup.find_all('div', class_='g')[:15]:
+                    try:
+                        link_elem = result.find('a')
+                        if not link_elem:
+                            continue
+                            
+                        link = link_elem.get('href', '')
+                        if not link.startswith('http'):
+                            continue
+                            
+                        title_elem = result.find('h3')
+                        title = title_elem.get_text(strip=True) if title_elem else ''
+                        
+                        snippet_elem = result.find('div', class_=lambda x: x and 'VwiC3b' in str(x))
+                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                        
+                        full_text = f"{title} {snippet}"
+                        price = extract_price_from_text(full_text)
+                        
+                        if price > 0:
+                            vendor = extract_vendor_from_url(link)
+                            products.append({
+                                'name': title[:150],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': vendor,
+                                'source_url': link,
+                                'description': snippet[:300],
+                                'search_engine': 'Google',
+                                'timestamp': search_timestamp
+                            })
+                    except:
+                        continue
+                        
+                logger.info(f"Google found {len(products) - initial_count} additional prices")
+        except Exception as e:
+            logger.warning(f"Google search failed: {e}")
+    
+    # Remove duplicates based on price + vendor
+    seen = set()
+    unique_products = []
+    for p in products:
+        key = (round(p['price'], -2), p['source'])  # Round to nearest 100 for dedup
+        if key not in seen:
+            seen.add(key)
+            unique_products.append(p)
+    
+    logger.info(f"Real web search returned {len(unique_products)} unique prices for: {query}")
+    return unique_products
+
+
+def validate_and_recheck_prices(prices: List[Dict], query: str) -> List[Dict]:
+    """
+    Validate prices and flag anomalies for re-checking.
+    Uses statistical methods to identify outliers.
+    """
+    if len(prices) < 2:
+        return prices
+    
+    price_values = [p['price'] for p in prices]
+    
+    # Calculate IQR for outlier detection
+    sorted_prices = sorted(price_values)
+    n = len(sorted_prices)
+    q1_idx = n // 4
+    q3_idx = (3 * n) // 4
+    q1 = sorted_prices[q1_idx]
+    q3 = sorted_prices[q3_idx]
+    iqr = q3 - q1
+    
+    # Define bounds (1.5 * IQR rule)
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    # Mark anomalies
+    validated = []
+    for p in prices:
+        price = p['price']
+        is_anomaly = price < lower_bound or price > upper_bound
+        
+        p_copy = p.copy()
+        p_copy['is_validated'] = not is_anomaly
+        p_copy['validation_note'] = 'Outlier detected - verify source' if is_anomaly else 'Price verified'
+        
+        # Only include non-outliers or if we have very few results
+        if not is_anomaly or len(prices) <= 5:
+            validated.append(p_copy)
+    
+    return validated
+
+
+def calculate_min_med_max_from_real_prices(validated_prices: List[Dict]) -> Dict:
+    """
+    Calculate Min, Median, Max from real web-scraped prices.
+    Returns the prices along with their source information.
+    """
+    if not validated_prices:
+        return {
+            'min': {'price': None, 'source': None, 'url': None},
+            'med': {'price': None, 'source': None, 'url': None},
+            'max': {'price': None, 'source': None, 'url': None},
+            'all_sources': []
+        }
+    
+    # Sort by price
+    sorted_by_price = sorted(validated_prices, key=lambda x: x['price'])
+    
+    # Get min (lowest price)
+    min_item = sorted_by_price[0]
+    min_price = min_item['price']
+    min_source = min_item.get('source', 'Unknown')
+    min_url = min_item.get('source_url', '')
+    
+    # Get max (highest price)
+    max_item = sorted_by_price[-1]
+    max_price = max_item['price']
+    max_source = max_item.get('source', 'Unknown')
+    max_url = max_item.get('source_url', '')
+    
+    # Get median
+    n = len(sorted_by_price)
+    mid_idx = n // 2
+    if n % 2 == 0:
+        med_price = (sorted_by_price[mid_idx - 1]['price'] + sorted_by_price[mid_idx]['price']) / 2
+        med_item = sorted_by_price[mid_idx]  # Use the higher median item for source
+    else:
+        med_price = sorted_by_price[mid_idx]['price']
+        med_item = sorted_by_price[mid_idx]
+    
+    med_source = med_item.get('source', 'Unknown')
+    med_url = med_item.get('source_url', '')
+    
+    # Collect all sources for traceability
+    all_sources = []
+    for p in validated_prices:
+        all_sources.append({
+            'price': p['price'],
+            'source': p.get('source', 'Unknown'),
+            'url': p.get('source_url', ''),
+            'search_engine': p.get('search_engine', 'Unknown'),
+            'timestamp': p.get('timestamp', '')
+        })
+    
+    return {
+        'min': {'price': min_price, 'source': min_source, 'url': min_url},
+        'med': {'price': med_price, 'source': med_source, 'url': med_url},
+        'max': {'price': max_price, 'source': max_source, 'url': max_url},
+        'all_sources': all_sources,
+        'price_count': len(validated_prices)
+    }
                     
     except Exception as e:
         logger.error(f"Free web search error: {e}")
