@@ -1641,6 +1641,139 @@ def get_osm_shop_category(query: str) -> str:
     else:
         return "electronics"  # Default to electronics for general product searches
 
+def simplify_product_query(product_name: str) -> str:
+    """
+    Simplify technical/long product names to get better search results.
+    Extracts key product terms and removes codes/abbreviations.
+    """
+    import re
+    
+    # Remove common patterns that don't help search
+    # Remove codes like "BWP", "PLY", model numbers, etc.
+    simplified = product_name
+    
+    # Remove text in parentheses or brackets
+    simplified = re.sub(r'\([^)]*\)', '', simplified)
+    simplified = re.sub(r'\[[^\]]*\]', '', simplified)
+    
+    # Remove common abbreviations and codes
+    codes_to_remove = [
+        r'\bBWP\b', r'\bPLY\b', r'\bMDF\b', r'\bHDF\b', r'\bSS\b',
+        r'\bL\b$', r'\bM\b$', r'\bS\b$', r'\bXL\b$',  # Size codes at end
+        r'\b[A-Z]{2,5}\d+\b',  # Model numbers like ABC123
+        r'\b\d+[A-Z]+\b',  # Numbers followed by letters
+        r'\bSIN\b', r'\bDOCLE\b',  # Specific codes
+    ]
+    for code in codes_to_remove:
+        simplified = re.sub(code, '', simplified, flags=re.IGNORECASE)
+    
+    # Remove special characters but keep spaces
+    simplified = re.sub(r'[^\w\s]', ' ', simplified)
+    
+    # Remove extra whitespace
+    simplified = ' '.join(simplified.split())
+    
+    # If too long, take first 5-6 meaningful words
+    words = simplified.split()
+    if len(words) > 6:
+        # Keep key product words
+        important_words = []
+        for word in words:
+            if len(word) > 2 and word.upper() not in ['THE', 'AND', 'FOR', 'WITH']:
+                important_words.append(word)
+                if len(important_words) >= 5:
+                    break
+        simplified = ' '.join(important_words)
+    
+    # Add "price" to help get shopping results
+    if simplified and 'price' not in simplified.lower():
+        simplified = simplified + ' price india'
+    
+    return simplified.strip()
+
+async def search_with_serpapi_enhanced(query: str, original_item: str, country: str = "india", max_results: int = 30) -> List[Dict]:
+    """
+    Enhanced search that tries multiple strategies to find results.
+    1. First tries the exact query
+    2. If no results, simplifies the query
+    3. If still no results, tries general Google search
+    """
+    # Strategy 1: Try with simplified query first (for technical items)
+    simplified_query = simplify_product_query(query)
+    logger.info(f"Simplified query: '{query}' -> '{simplified_query}'")
+    
+    # Try simplified query
+    results = await search_with_serpapi(simplified_query, country, max_results)
+    if results:
+        logger.info(f"Found {len(results)} results with simplified query")
+        return results
+    
+    # Strategy 2: Try original query
+    if simplified_query != query:
+        results = await search_with_serpapi(query, country, max_results)
+        if results:
+            logger.info(f"Found {len(results)} results with original query")
+            return results
+    
+    # Strategy 3: Extract key product type and search
+    # Try to identify the main product type
+    product_keywords = extract_product_type(original_item)
+    if product_keywords and product_keywords != simplified_query:
+        results = await search_with_serpapi(product_keywords + " price india", country, max_results)
+        if results:
+            logger.info(f"Found {len(results)} results with product keywords: '{product_keywords}'")
+            return results
+    
+    logger.warning(f"No results found for: {query}")
+    return []
+
+def extract_product_type(item_name: str) -> str:
+    """
+    Extract the main product type from a detailed item name.
+    """
+    item_lower = item_name.lower()
+    
+    # Common product type mappings
+    product_types = {
+        'sink': 'kitchen sink',
+        'refrigerator': 'refrigerator',
+        'fridge': 'refrigerator',
+        'ply': 'plywood',
+        'plywood': 'plywood',
+        'counter': 'kitchen counter top',
+        'quartz': 'quartz stone',
+        'dado': 'wall tiles',
+        'cabinet': 'kitchen cabinet',
+        'chimney': 'kitchen chimney',
+        'hob': 'kitchen hob',
+        'mixer': 'mixer grinder',
+        'tap': 'kitchen tap',
+        'faucet': 'kitchen faucet',
+        'granite': 'granite slab',
+        'marble': 'marble slab',
+        'tile': 'tiles',
+        'laminate': 'laminate sheet',
+        'hardware': 'kitchen hardware',
+        'drawer': 'kitchen drawer',
+        'shutter': 'kitchen shutter',
+        'bosch': 'bosch appliance',
+        'carysil': 'carysil sink',
+        'franke': 'franke sink',
+    }
+    
+    for keyword, product_type in product_types.items():
+        if keyword in item_lower:
+            # Add brand if present
+            brands = ['bosch', 'carysil', 'franke', 'lg', 'samsung', 'whirlpool', 'godrej', 'haier']
+            for brand in brands:
+                if brand in item_lower:
+                    return f"{brand} {product_type}"
+            return product_type
+    
+    # Fallback: return first few words
+    words = item_name.split()[:3]
+    return ' '.join(words)
+
 # ================== REAL SERPAPI SEARCH ==================
 async def search_with_serpapi(query: str, country: str = "in", max_results: int = 30, city: str = "") -> List[Dict]:
     """
