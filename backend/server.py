@@ -3937,7 +3937,39 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         legend_red.fill = red_fill
         legend_red.font = red_font
         
-        output_sheet.cell(row=legend_row + 4, column=1, value="Note: Rate Diff and Amount Diff columns show comparison for each rate type (Min, Med, Max).").font = Font(italic=True)
+        output_sheet.cell(row=legend_row + 4, column=1, value="Note: All prices sourced from real web searches. Rate Diff and Amount Diff columns show comparison for each rate type (Min, Med, Max).").font = Font(italic=True)
+        output_sheet.cell(row=legend_row + 5, column=1, value="See 'Sources' sheet for detailed source URLs and timestamps.").font = Font(italic=True)
+        
+        # ========== CREATE SOURCES SHEET FOR TRACEABILITY ==========
+        sources_sheet = output_workbook.create_sheet(title="Sources")
+        
+        # Sources sheet headers
+        sources_headers = ["Item", "Detected Price (₹)", "Vendor/Source", "URL", "Timestamp"]
+        for col_idx, header in enumerate(sources_headers, start=1):
+            cell = sources_sheet.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        # Write all sources data
+        source_row = 2
+        for source in all_item_sources:
+            sources_sheet.cell(row=source_row, column=1, value=source.get('item', '')).border = thin_border
+            sources_sheet.cell(row=source_row, column=2, value=source.get('price', 0)).border = thin_border
+            sources_sheet.cell(row=source_row, column=3, value=source.get('vendor', 'Unknown')).border = thin_border
+            url_cell = sources_sheet.cell(row=source_row, column=4, value=source.get('url', ''))
+            url_cell.border = thin_border
+            url_cell.alignment = Alignment(wrap_text=True)
+            sources_sheet.cell(row=source_row, column=5, value=source.get('timestamp', '')).border = thin_border
+            source_row += 1
+        
+        # Adjust sources sheet column widths
+        sources_sheet.column_dimensions['A'].width = 35
+        sources_sheet.column_dimensions['B'].width = 15
+        sources_sheet.column_dimensions['C'].width = 20
+        sources_sheet.column_dimensions['D'].width = 60
+        sources_sheet.column_dimensions['E'].width = 25
         
         # Save to BytesIO
         output_buffer = io.BytesIO()
@@ -3948,7 +3980,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"PriceComparison_Results_{timestamp}.xlsx"
         
-        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results.")
+        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results and {len(all_item_sources)} source entries.")
         
         # Return as downloadable file
         return StreamingResponse(
