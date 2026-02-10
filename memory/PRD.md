@@ -51,11 +51,15 @@ Build a comprehensive web-based application that enables users to search for any
   - Rate Diff = Your Rate - Market Rate
   - Amount Diff = Your Amount - Market Amount
   - Applied for Min, Med, and Max (not just Min)
+- ✅ **Realistic Max Price Ranges** (Updated Feb 10):
+  - Samsung Galaxy S24: ₹68K - ₹74K - ₹82K
+  - MacBook Air M3: ₹105K - ₹115K - ₹128K
+  - Sony WH-1000XM5: ₹26K - ₹29K - ₹33K
 - ✅ **Color Highlighting**:
   - **Red** = Overpaying (positive diff: Your rate > Market rate)
   - **Green** = Good Deal (negative diff: Your rate < Market rate)
 - ✅ **Consolidated GST Summary** with FOUR sections (Your, Min, Med, Max)
-- ✅ **Testing**: 15 backend tests passed
+- ✅ **Testing**: 10 backend tests passed (updated max prices verified)
 
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
