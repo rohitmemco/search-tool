@@ -1847,34 +1847,37 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
     
     async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
         
-        # Source 1: Bing Search
+        # Source 1: Bing Search with different user agents
         try:
-            bing_url = f"https://www.bing.com/search?q={encoded_query}&count=30"
-            response = await client.get(bing_url, headers=headers)
+            bing_headers = headers.copy()
+            bing_headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            
+            bing_url = f"https://www.bing.com/search?q={encoded_query}&count=50&setlang=en-IN"
+            response = await client.get(bing_url, headers=bing_headers)
             
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'lxml')
                 
-                for result in soup.find_all('li', class_='b_algo')[:max_results]:
+                # Try multiple selectors for Bing results
+                results = soup.find_all('li', class_='b_algo')
+                if not results:
+                    results = soup.find_all('div', class_='b_algo')
+                if not results:
+                    results = soup.select('.b_algo, .b_ans, .b_top')
+                
+                for result in results[:max_results]:
                     try:
-                        link_elem = result.find('a')
+                        link_elem = result.find('a', href=True)
                         if not link_elem:
                             continue
                             
                         title = link_elem.get_text(strip=True)
                         link = link_elem.get('href', '')
                         
-                        # Get snippet/description
-                        snippet_elem = result.find('p')
-                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
+                        # Get all text from the result
+                        all_text = result.get_text(separator=' ', strip=True)
                         
-                        # Also check for price-specific elements
-                        price_elem = result.find(class_=lambda x: x and 'price' in str(x).lower())
-                        price_text = price_elem.get_text(strip=True) if price_elem else ''
-                        
-                        # Combine all text for price extraction
-                        full_text = f"{title} {snippet} {price_text}"
-                        price = extract_price_from_text(full_text)
+                        price = extract_price_from_text(all_text)
                         
                         if price > 0:
                             vendor = extract_vendor_from_url(link)
@@ -1885,11 +1888,11 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
                                 'currency_code': 'INR',
                                 'source': vendor,
                                 'source_url': link,
-                                'description': snippet[:300],
+                                'description': all_text[:300],
                                 'search_engine': 'Bing',
                                 'timestamp': search_timestamp
                             })
-                    except Exception as e:
+                    except Exception:
                         continue
                         
             logger.info(f"Bing search found {len(products)} prices for: {query}")
