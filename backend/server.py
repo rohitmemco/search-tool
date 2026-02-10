@@ -2472,12 +2472,11 @@ async def bulk_search_upload(file: UploadFile = File(...)):
     Process each product, search for prices, and return results as downloadable Excel.
     
     Expected Excel format:
-    - Column A: Product Name (required)
-    - Column B: Location/City (optional)
+    - Column A: SL No (Serial Number)
+    - Column B: Item (Product Name)
     
-    Output Excel contains:
-    - Product Name, Location, Min Price, Med Price, Max Price, 
-    - Cheapest Vendor, Cheapest Website, All Vendors, All Websites
+    Output Excel contains ONLY:
+    - SL No, Item, Min Rate, Medium Rate, Max Rate, Website Links, Vendor Details
     """
     try:
         # Validate file type
@@ -2494,30 +2493,30 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
         
-        # Extract product entries from Excel
+        # Extract product entries from Excel (Column A: SL No, Column B: Item)
         products = []
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):  # Skip header
-            if row and row[0]:  # Check if product name exists
-                product_name = str(row[0]).strip()
-                location = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-                if product_name:
+            if row and len(row) >= 2 and row[1]:  # Check if Item name exists in Column B
+                sl_no = str(row[0]).strip() if row[0] else str(row_idx - 1)
+                item_name = str(row[1]).strip()
+                if item_name:
                     products.append({
                         "row": row_idx,
-                        "product": product_name,
-                        "location": location,
-                        "query": f"{product_name} {location}".strip() if location else product_name
+                        "sl_no": sl_no,
+                        "item": item_name,
+                        "query": item_name
                     })
         
         if not products:
-            raise HTTPException(status_code=400, detail="No products found in Excel file. Please add products in Column A starting from row 2.")
+            raise HTTPException(status_code=400, detail="No items found in Excel file. Please add SL No in Column A and Item names in Column B starting from row 2.")
         
-        logger.info(f"Processing {len(products)} products from Excel upload")
+        logger.info(f"Processing {len(products)} items from Excel upload")
         
         # Process each product
         results = []
         for idx, product_info in enumerate(products):
             try:
-                logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['query']}")
+                logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']}")
                 
                 # Search using SerpAPI
                 search_results = await search_with_serpapi(
@@ -2543,8 +2542,6 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     # Get vendor/website info
                     vendors = []
                     websites = []
-                    cheapest_vendor = ""
-                    cheapest_website = ""
                     
                     for r in search_results:
                         vendor = r.get('source', '')
@@ -2552,75 +2549,49 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         if vendor and vendor not in vendors:
                             vendors.append(vendor)
                         if website:
-                            # Extract domain from URL
-                            try:
-                                from urllib.parse import urlparse
-                                domain = urlparse(website).netloc
-                                if domain and domain not in websites:
-                                    websites.append(domain)
-                            except:
-                                pass
-                        
-                        # Track cheapest
-                        if r.get('price', 0) == min_price and min_price > 0:
-                            if not cheapest_vendor:
-                                cheapest_vendor = vendor
-                                cheapest_website = website
+                            # Keep full URL for website links
+                            if website not in websites:
+                                websites.append(website)
                     
                     results.append({
-                        "row": product_info['row'],
-                        "product": product_info['product'],
-                        "location": product_info['location'],
-                        "min_price": min_price,
-                        "med_price": round(med_price, 2),
-                        "max_price": max_price,
-                        "cheapest_vendor": cheapest_vendor,
-                        "cheapest_website": cheapest_website,
-                        "all_vendors": ", ".join(vendors[:10]),  # Limit to 10
-                        "all_websites": ", ".join(websites[:10]),
-                        "results_count": len(search_results),
-                        "status": "Success"
+                        "sl_no": product_info['sl_no'],
+                        "item": product_info['item'],
+                        "min_rate": min_price,
+                        "med_rate": round(med_price, 2),
+                        "max_rate": max_price,
+                        "website_links": "\n".join(websites[:5]),  # Top 5 website links
+                        "vendor_details": ", ".join(vendors[:10])  # Top 10 vendors
                     })
                 else:
                     results.append({
-                        "row": product_info['row'],
-                        "product": product_info['product'],
-                        "location": product_info['location'],
-                        "min_price": 0,
-                        "med_price": 0,
-                        "max_price": 0,
-                        "cheapest_vendor": "",
-                        "cheapest_website": "",
-                        "all_vendors": "",
-                        "all_websites": "",
-                        "results_count": 0,
-                        "status": "No results found"
+                        "sl_no": product_info['sl_no'],
+                        "item": product_info['item'],
+                        "min_rate": "N/A",
+                        "med_rate": "N/A",
+                        "max_rate": "N/A",
+                        "website_links": "No results found",
+                        "vendor_details": "No results found"
                     })
                 
                 # Small delay to avoid rate limiting
                 await asyncio.sleep(0.5)
                 
             except Exception as e:
-                logger.error(f"Error processing product {product_info['product']}: {str(e)}")
+                logger.error(f"Error processing item {product_info['item']}: {str(e)}")
                 results.append({
-                    "row": product_info['row'],
-                    "product": product_info['product'],
-                    "location": product_info['location'],
-                    "min_price": 0,
-                    "med_price": 0,
-                    "max_price": 0,
-                    "cheapest_vendor": "",
-                    "cheapest_website": "",
-                    "all_vendors": "",
-                    "all_websites": "",
-                    "results_count": 0,
-                    "status": f"Error: {str(e)}"
+                    "sl_no": product_info['sl_no'],
+                    "item": product_info['item'],
+                    "min_rate": "Error",
+                    "med_rate": "Error",
+                    "max_rate": "Error",
+                    "website_links": f"Error: {str(e)}",
+                    "vendor_details": "Error"
                 })
         
-        # Generate output Excel
+        # Generate output Excel with ONLY required columns
         output_workbook = Workbook()
         output_sheet = output_workbook.active
-        output_sheet.title = "Price Comparison Results"
+        output_sheet.title = "Price Results"
         
         # Define styles
         header_font = Font(bold=True, color="FFFFFF")
@@ -2633,11 +2604,10 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             bottom=Side(style='thin')
         )
         
-        # Write headers
+        # Write headers - ONLY required columns
         headers = [
-            "S.No", "Product Name", "Location", "Min Price (₹)", "Median Price (₹)", 
-            "Max Price (₹)", "Cheapest Vendor", "Cheapest Website", 
-            "All Vendors", "All Websites", "Results Count", "Status"
+            "SL No", "Item", "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)", 
+            "Website Links", "Vendor Details"
         ]
         
         for col_idx, header in enumerate(headers, start=1):
@@ -2650,34 +2620,58 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         # Write data
         for row_idx, result in enumerate(results, start=2):
             data = [
-                row_idx - 1,  # S.No
-                result['product'],
-                result['location'],
-                result['min_price'],
-                result['med_price'],
-                result['max_price'],
-                result['cheapest_vendor'],
-                result['cheapest_website'],
-                result['all_vendors'],
-                result['all_websites'],
-                result['results_count'],
-                result['status']
+                result['sl_no'],
+                result['item'],
+                result['min_rate'],
+                result['med_rate'],
+                result['max_rate'],
+                result['website_links'],
+                result['vendor_details']
             ]
             
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
-                if col_idx in [4, 5, 6]:  # Price columns
+                if col_idx in [3, 4, 5]:  # Price columns
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 12:  # Status column
-                    if "Success" in str(value):
-                        cell.font = Font(color="008000")  # Green
-                    else:
-                        cell.font = Font(color="FF0000")  # Red
+                elif col_idx == 6:  # Website links - wrap text
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
         
         # Adjust column widths
-        column_widths = [8, 35, 15, 15, 15, 15, 25, 40, 50, 50, 12, 20]
+        column_widths = [10, 40, 15, 15, 15, 60, 50]
         for col_idx, width in enumerate(column_widths, start=1):
+            output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+        
+        # Set row heights for website links (allow for multiple lines)
+        for row_idx in range(2, len(results) + 2):
+            output_sheet.row_dimensions[row_idx].height = 60
+        
+        # Save to BytesIO
+        output_buffer = io.BytesIO()
+        output_workbook.save(output_buffer)
+        output_buffer.seek(0)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"PriceSearch_Results_{timestamp}.xlsx"
+        
+        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results.")
+        
+        # Return as downloadable file
+        return StreamingResponse(
+            output_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={output_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bulk search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing Excel file: {str(e)}")
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
         # Add summary row
