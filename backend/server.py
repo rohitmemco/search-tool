@@ -2967,23 +2967,66 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
         
-        # Extract product entries from Excel (Column A: SL No, Column B: Item, Column C: Quantity)
+        # Extract product entries from Excel
+        # First, detect column positions from header row
         products = []
-        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):  # Skip header
-            if row and len(row) >= 2 and row[1]:  # Check if Item name exists in Column B
-                sl_no = str(row[0]).strip() if row[0] else str(row_idx - 1)
-                item_name = str(row[1]).strip()
-                # Get quantity from Column C, default to 1 if not provided
+        header_row = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+        
+        # Find column indices (case-insensitive matching)
+        sl_col = None
+        item_col = None
+        qty_col = None
+        
+        for idx, header in enumerate(header_row):
+            if header:
+                header_lower = str(header).lower().strip()
+                if 'sl' in header_lower or 'serial' in header_lower or 'no' in header_lower or 's.no' in header_lower:
+                    sl_col = idx
+                elif 'item' in header_lower or 'product' in header_lower or 'name' in header_lower or 'description' in header_lower:
+                    item_col = idx
+                elif 'qty' in header_lower or 'quantity' in header_lower or 'quant' in header_lower:
+                    qty_col = idx
+        
+        # Fallback to default positions if headers not found
+        if sl_col is None:
+            sl_col = 0
+        if item_col is None:
+            item_col = 1
+        if qty_col is None:
+            qty_col = 2
+        
+        logger.info(f"Detected columns - SL: {sl_col}, Item: {item_col}, Qty: {qty_col}")
+        logger.info(f"Headers found: {header_row[:5]}")
+        
+        # Now extract data rows
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if row and len(row) > item_col and row[item_col]:
+                # Get SL No
+                sl_no = str(row[sl_col]).strip() if sl_col < len(row) and row[sl_col] else str(row_idx - 1)
+                
+                # Get Item name
+                item_name = str(row[item_col]).strip()
+                
+                # Get Quantity - check if column exists and has value
                 quantity = 1
-                if len(row) >= 3 and row[2]:
+                if qty_col is not None and qty_col < len(row) and row[qty_col] is not None:
                     try:
-                        quantity = int(float(str(row[2]).strip()))
+                        qty_value = row[qty_col]
+                        logger.info(f"Row {row_idx}: Raw quantity value = '{qty_value}' (type: {type(qty_value).__name__})")
+                        
+                        if isinstance(qty_value, (int, float)):
+                            quantity = int(qty_value)
+                        else:
+                            quantity = int(float(str(qty_value).strip().replace(',', '')))
+                        
                         if quantity < 1:
                             quantity = 1
-                    except (ValueError, TypeError):
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Row {row_idx}: Could not parse quantity '{row[qty_col]}': {e}")
                         quantity = 1
                 
-                if item_name:
+                if item_name and item_name.lower() not in ['item', 'product', 'name', 'description']:
+                    logger.info(f"Row {row_idx}: SL={sl_no}, Item={item_name[:30]}..., Qty={quantity}")
                     products.append({
                         "row": row_idx,
                         "sl_no": sl_no,
