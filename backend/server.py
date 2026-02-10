@@ -1696,35 +1696,51 @@ def simplify_product_query(product_name: str) -> str:
 async def search_with_serpapi_enhanced(query: str, original_item: str, country: str = "india", max_results: int = 30) -> List[Dict]:
     """
     Enhanced search that tries multiple strategies to find results.
-    1. First tries the exact query
-    2. If no results, simplifies the query
-    3. If still no results, tries general Google search
+    1. First tries SerpAPI with simplified query
+    2. If SerpAPI fails or quota exceeded, falls back to free web search
+    3. Uses multiple query variations to maximize results
     """
-    # Strategy 1: Try with simplified query first (for technical items)
-    simplified_query = simplify_product_query(query)
-    logger.info(f"Simplified query: '{query}' -> '{simplified_query}'")
+    results = []
     
-    # Try simplified query
-    results = await search_with_serpapi(simplified_query, country, max_results)
+    # Strategy 1: Try SerpAPI first (if available)
+    try:
+        simplified_query = simplify_product_query(query)
+        logger.info(f"Simplified query: '{query}' -> '{simplified_query}'")
+        
+        results = await search_with_serpapi(simplified_query, country, max_results)
+        if results:
+            logger.info(f"Found {len(results)} results with SerpAPI")
+            return results
+    except Exception as e:
+        error_msg = str(e)
+        if "quota" in error_msg.lower() or "run out" in error_msg.lower():
+            logger.warning(f"SerpAPI quota exceeded, falling back to free search")
+        else:
+            logger.warning(f"SerpAPI error: {error_msg}, falling back to free search")
+    
+    # Strategy 2: Fall back to FREE web search (no API key needed)
+    logger.info(f"Using free web search for: {query}")
+    
+    # Try with simplified query
+    simplified_query = simplify_product_query(query)
+    results = await search_free_web(simplified_query, max_results)
     if results:
-        logger.info(f"Found {len(results)} results with simplified query")
+        logger.info(f"Found {len(results)} results with free web search (simplified)")
         return results
     
-    # Strategy 2: Try original query
-    if simplified_query != query:
-        results = await search_with_serpapi(query, country, max_results)
-        if results:
-            logger.info(f"Found {len(results)} results with original query")
-            return results
-    
-    # Strategy 3: Extract key product type and search
-    # Try to identify the main product type
+    # Try with product type keywords
     product_keywords = extract_product_type(original_item)
-    if product_keywords and product_keywords != simplified_query:
-        results = await search_with_serpapi(product_keywords + " price india", country, max_results)
+    if product_keywords:
+        results = await search_free_web(product_keywords + " price india", max_results)
         if results:
             logger.info(f"Found {len(results)} results with product keywords: '{product_keywords}'")
             return results
+    
+    # Try with original query
+    results = await search_free_web(query + " price india", max_results)
+    if results:
+        logger.info(f"Found {len(results)} results with original query")
+        return results
     
     logger.warning(f"No results found for: {query}")
     return []
