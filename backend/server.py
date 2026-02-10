@@ -3174,30 +3174,17 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "vendor_details": "No valid prices found"
                         })
                 else:
-                    # No search results - still calculate user's GST
-                    user_cgst = user_amount * 0.09
-                    user_sgst = user_amount * 0.09
-                    user_grand_total = user_amount + user_cgst + user_sgst
-                    
+                    # No search results
                     results.append({
                         "sl_no": product_info['sl_no'],
                         "item": product_info['item'],
                         "user_rate": round(user_rate, 2),
                         "quantity": quantity,
                         "user_amount": round(user_amount, 2),
-                        "user_cgst": round(user_cgst, 2),
-                        "user_sgst": round(user_sgst, 2),
-                        "user_grand_total": round(user_grand_total, 2),
-                        "min_rate": "N/A",
-                        "med_rate": "N/A",
-                        "max_rate": "N/A",
-                        "med_total": "N/A",
-                        "market_cgst": "N/A",
-                        "market_sgst": "N/A",
-                        "market_grand_total": "N/A",
+                        "market_min_rate": "N/A",
+                        "market_min_total": "N/A",
                         "rate_diff": "N/A",
                         "amount_diff": "N/A",
-                        "grand_total_diff": "N/A",
                         "website_links": "No results found",
                         "vendor_details": "No results found"
                     })
@@ -3209,31 +3196,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 error_msg = str(e)
                 logger.error(f"Error processing item {product_info['item']}: {error_msg}")
                 
-                # Calculate user's GST even on error
-                user_amt = product_info.get('user_amount', 0)
-                user_cgst = user_amt * 0.09
-                user_sgst = user_amt * 0.09
-                user_grand_total = user_amt + user_cgst + user_sgst
-                
                 results.append({
                     "sl_no": product_info['sl_no'],
                     "item": product_info['item'],
                     "user_rate": product_info.get('user_rate', 0),
                     "quantity": product_info.get('quantity', 1),
-                    "user_amount": round(user_amt, 2),
-                    "user_cgst": round(user_cgst, 2),
-                    "user_sgst": round(user_sgst, 2),
-                    "user_grand_total": round(user_grand_total, 2),
-                    "min_rate": "Error",
-                    "med_rate": "Error",
-                    "max_rate": "Error",
-                    "med_total": "Error",
-                    "market_cgst": "Error",
-                    "market_sgst": "Error",
-                    "market_grand_total": "Error",
+                    "user_amount": product_info.get('user_amount', 0),
+                    "market_min_rate": "Error",
+                    "market_min_total": "Error",
                     "rate_diff": "Error",
                     "amount_diff": "Error",
-                    "grand_total_diff": "Error",
                     "website_links": f"Error: {error_msg}",
                     "vendor_details": "Error"
                 })
