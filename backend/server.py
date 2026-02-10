@@ -3210,10 +3210,10 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     "vendor_details": "Error"
                 })
         
-        # Generate output Excel with GST calculations
+        # Generate output Excel with consolidated GST summary
         output_workbook = Workbook()
         output_sheet = output_workbook.active
-        output_sheet.title = "Price Comparison with GST"
+        output_sheet.title = "Price Comparison"
         
         # Define styles
         header_font = Font(bold=True, color="FFFFFF")
@@ -3225,98 +3225,76 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             top=Side(style='thin'),
             bottom=Side(style='thin')
         )
+        thick_border = Border(
+            left=Side(style='medium'),
+            right=Side(style='medium'),
+            top=Side(style='medium'),
+            bottom=Side(style='medium')
+        )
         
         # Colors for comparison highlighting
         green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Good deal
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")    # Overpaying
         green_font = Font(color="006100")
         red_font = Font(color="9C0006")
-        yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # GST columns
+        summary_fill = PatternFill(start_color="D9EAD3", end_color="D9EAD3", fill_type="solid")  # Summary section
+        total_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")  # Total row
         
-        # Write headers with GST columns
-        # Columns: A-B (Item Details), C-H (Your Data with GST), I-M (Market Data with GST), N-O (Difference), P-Q (Sources)
+        # Simplified headers - NO per-item GST columns
         headers = [
             "SL No", "Item", 
-            "Your Rate (₹)", "Qty", "Your Amount (₹)", "Your CGST @9%", "Your SGST @9%", "Your Grand Total (₹)",
-            "Market Rate (₹)", "Market Amount (₹)", "Market CGST @9%", "Market SGST @9%", "Market Grand Total (₹)",
-            "Rate Diff (₹)", "Grand Total Diff (₹)",
+            "Your Rate (₹)", "Qty", "Your Amount (₹)",
+            "Market Min Rate (₹)", "Market Min Amount (₹)",
+            "Rate Diff (₹)", "Amount Diff (₹)",
             "Website Links", "Vendor Details"
         ]
         
-        # Category headers (merge cells for better organization)
-        # A-B: Item Details, C-H: Your Data (6 cols), I-M: Market Data (5 cols), N-O: Difference (2 cols), P-Q: Sources (2 cols)
-        output_sheet.merge_cells('A1:B1')
-        output_sheet.merge_cells('C1:H1')
-        output_sheet.merge_cells('I1:M1')
-        output_sheet.merge_cells('N1:O1')
-        output_sheet.merge_cells('P1:Q1')
-        
-        # Write category headers (row 1)
-        category_headers = [
-            ("A1", "Item Details"),
-            ("C1", "Your Data (with GST)"),
-            ("I1", "Market Data (with GST)"),
-            ("N1", "Difference"),
-            ("P1", "Sources")
-        ]
-        for cell_ref, text in category_headers:
-            cell = output_sheet[cell_ref]
-            cell.value = text
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-        
-        # Write column headers (row 2)
+        # Write column headers (row 1)
         for col_idx, header in enumerate(headers, start=1):
-            cell = output_sheet.cell(row=2, column=col_idx, value=header)
+            cell = output_sheet.cell(row=1, column=col_idx, value=header)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
             cell.border = thin_border
-            # Highlight GST columns with yellow
-            if 'CGST' in header or 'SGST' in header:
-                cell.fill = yellow_fill
-                cell.font = Font(bold=True)
         
-        # Write data (starting row 3)
-        for row_idx, result in enumerate(results, start=3):
+        # Calculate totals while writing data
+        total_your_amount = 0
+        total_market_min_amount = 0
+        
+        # Write data (starting row 2)
+        for row_idx, result in enumerate(results, start=2):
+            # Accumulate totals
+            if isinstance(result['user_amount'], (int, float)):
+                total_your_amount += result['user_amount']
+            if isinstance(result.get('market_min_total'), (int, float)):
+                total_market_min_amount += result['market_min_total']
+            
             data = [
                 result['sl_no'],                    # A - SL No
                 result['item'],                     # B - Item
                 result['user_rate'],                # C - Your Rate
                 result['quantity'],                 # D - Qty
                 result['user_amount'],              # E - Your Amount
-                result['user_cgst'],                # F - Your CGST @9%
-                result['user_sgst'],                # G - Your SGST @9%
-                result['user_grand_total'],         # H - Your Grand Total
-                result['med_rate'],                 # I - Market Rate (using median)
-                result['med_total'],                # J - Market Amount
-                result['market_cgst'],              # K - Market CGST @9%
-                result['market_sgst'],              # L - Market SGST @9%
-                result['market_grand_total'],       # M - Market Grand Total
-                result['rate_diff'],                # N - Rate Diff
-                result['grand_total_diff'],         # O - Grand Total Diff
-                result['website_links'],            # P - Website Links
-                result['vendor_details']            # Q - Vendor Details
+                result.get('market_min_rate', 'N/A'),  # F - Market Min Rate
+                result.get('market_min_total', 'N/A'), # G - Market Min Amount
+                result['rate_diff'],                # H - Rate Diff
+                result['amount_diff'],              # I - Amount Diff
+                result['website_links'],            # J - Website Links
+                result['vendor_details']            # K - Vendor Details
             ]
             
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
                 
-                # Number columns - right align (columns C through O are numeric)
-                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
+                # Number columns - right align
+                if col_idx in [3, 4, 5, 6, 7, 8, 9]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 16:  # Website links - wrap text
+                elif col_idx == 10:  # Website links - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
                 
-                # Highlight GST columns with light yellow background
-                if col_idx in [6, 7, 11, 12]:  # CGST/SGST columns
-                    if isinstance(value, (int, float)):
-                        cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-                
-                # Apply color highlighting for difference columns (N and O - Rate Diff and Grand Total Diff)
-                if col_idx in [14, 15]:
+                # Apply color highlighting for difference columns (H and I)
+                if col_idx in [8, 9]:
                     if isinstance(value, (int, float)):
                         if value > 0:  # Positive = You're paying MORE than market (Overpaying)
                             cell.fill = red_fill
@@ -3325,19 +3303,132 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             cell.fill = green_fill
                             cell.font = green_font
         
-        # Adjust column widths (17 columns now)
-        column_widths = [8, 35, 12, 6, 14, 14, 14, 16, 14, 14, 14, 14, 16, 12, 16, 45, 40]
+        # Adjust column widths (11 columns)
+        column_widths = [8, 40, 14, 6, 16, 16, 18, 14, 16, 50, 45]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
         # Set row heights
-        output_sheet.row_dimensions[1].height = 25  # Category header row
-        output_sheet.row_dimensions[2].height = 35  # Column header row
-        for row_idx in range(3, len(results) + 3):
-            output_sheet.row_dimensions[row_idx].height = 50
+        output_sheet.row_dimensions[1].height = 35  # Header row
+        for row_idx in range(2, len(results) + 2):
+            output_sheet.row_dimensions[row_idx].height = 45
         
-        # Add legend at the bottom
-        legend_row = len(results) + 5
+        # ========== CONSOLIDATED GST SUMMARY SECTION ==========
+        summary_start_row = len(results) + 4
+        
+        # Calculate GST on totals
+        cgst_rate = 0.09
+        sgst_rate = 0.09
+        
+        # Your pricing GST
+        your_cgst = round(total_your_amount * cgst_rate, 2)
+        your_sgst = round(total_your_amount * sgst_rate, 2)
+        your_subtotal = total_your_amount + your_cgst + your_sgst
+        your_round_off = round(your_subtotal) - your_subtotal
+        your_grand_total = round(your_subtotal)
+        
+        # Market minimum pricing GST
+        market_cgst = round(total_market_min_amount * cgst_rate, 2)
+        market_sgst = round(total_market_min_amount * sgst_rate, 2)
+        market_subtotal = total_market_min_amount + market_cgst + market_sgst
+        market_round_off = round(market_subtotal) - market_subtotal
+        market_grand_total = round(market_subtotal)
+        
+        # Difference
+        savings = your_grand_total - market_grand_total
+        
+        # Summary Header
+        output_sheet.merge_cells(f'A{summary_start_row}:E{summary_start_row}')
+        summary_header = output_sheet.cell(row=summary_start_row, column=1, value="CONSOLIDATED SUMMARY (GST Calculation)")
+        summary_header.font = Font(bold=True, size=14, color="FFFFFF")
+        summary_header.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+        summary_header.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Two-column summary layout
+        summary_row = summary_start_row + 2
+        
+        # Your Pricing Summary (Column A-B)
+        output_sheet.merge_cells(f'A{summary_row}:B{summary_row}')
+        your_header = output_sheet.cell(row=summary_row, column=1, value="YOUR PRICING")
+        your_header.font = Font(bold=True, size=12, color="FFFFFF")
+        your_header.fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+        your_header.alignment = Alignment(horizontal="center")
+        
+        # Market Pricing Summary (Column D-E)
+        output_sheet.merge_cells(f'D{summary_row}:E{summary_row}')
+        market_header = output_sheet.cell(row=summary_row, column=4, value="MARKET MINIMUM PRICING")
+        market_header.font = Font(bold=True, size=12, color="FFFFFF")
+        market_header.fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
+        market_header.alignment = Alignment(horizontal="center")
+        
+        # Your Pricing Details
+        your_data = [
+            ("Taxable Amount", f"₹{total_your_amount:,.2f}"),
+            ("CGST @ 9.0%", f"₹{your_cgst:,.2f}"),
+            ("SGST @ 9.0%", f"₹{your_sgst:,.2f}"),
+            ("Round Off", f"₹{your_round_off:,.2f}"),
+            ("Grand Total", f"₹{your_grand_total:,.2f}"),
+        ]
+        
+        for i, (label, value) in enumerate(your_data):
+            row = summary_row + 1 + i
+            label_cell = output_sheet.cell(row=row, column=1, value=label)
+            value_cell = output_sheet.cell(row=row, column=2, value=value)
+            label_cell.border = thin_border
+            value_cell.border = thin_border
+            value_cell.alignment = Alignment(horizontal="right")
+            
+            if label == "Grand Total":
+                label_cell.font = Font(bold=True)
+                value_cell.font = Font(bold=True)
+                label_cell.fill = summary_fill
+                value_cell.fill = summary_fill
+        
+        # Market Pricing Details
+        market_data = [
+            ("Taxable Amount", f"₹{total_market_min_amount:,.2f}"),
+            ("CGST @ 9.0%", f"₹{market_cgst:,.2f}"),
+            ("SGST @ 9.0%", f"₹{market_sgst:,.2f}"),
+            ("Round Off", f"₹{market_round_off:,.2f}"),
+            ("Grand Total", f"₹{market_grand_total:,.2f}"),
+        ]
+        
+        for i, (label, value) in enumerate(market_data):
+            row = summary_row + 1 + i
+            label_cell = output_sheet.cell(row=row, column=4, value=label)
+            value_cell = output_sheet.cell(row=row, column=5, value=value)
+            label_cell.border = thin_border
+            value_cell.border = thin_border
+            value_cell.alignment = Alignment(horizontal="right")
+            
+            if label == "Grand Total":
+                label_cell.font = Font(bold=True)
+                value_cell.font = Font(bold=True)
+                label_cell.fill = summary_fill
+                value_cell.fill = summary_fill
+        
+        # Comparison / Savings section
+        comparison_row = summary_row + 7
+        output_sheet.merge_cells(f'A{comparison_row}:E{comparison_row}')
+        if savings > 0:
+            comparison_text = f"DIFFERENCE: You are paying ₹{savings:,.2f} MORE than market minimum (OVERPAYING)"
+            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
+            comparison_cell.fill = red_fill
+            comparison_cell.font = Font(bold=True, color="9C0006")
+        elif savings < 0:
+            comparison_text = f"DIFFERENCE: You are paying ₹{abs(savings):,.2f} LESS than market minimum (GOOD DEAL)"
+            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
+            comparison_cell.fill = green_fill
+            comparison_cell.font = Font(bold=True, color="006100")
+        else:
+            comparison_text = "DIFFERENCE: Your pricing matches market minimum"
+            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
+            comparison_cell.font = Font(bold=True)
+        comparison_cell.alignment = Alignment(horizontal="center")
+        comparison_cell.border = thick_border
+        
+        # Legend
+        legend_row = comparison_row + 3
         output_sheet.cell(row=legend_row, column=1, value="Legend:").font = Font(bold=True)
         
         legend_green = output_sheet.cell(row=legend_row + 1, column=1, value="Green = Good Deal (Your rate is LOWER than market)")
@@ -3347,12 +3438,6 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         legend_red = output_sheet.cell(row=legend_row + 2, column=1, value="Red = Overpaying (Your rate is HIGHER than market)")
         legend_red.fill = red_fill
         legend_red.font = red_font
-        
-        # GST explanation
-        output_sheet.cell(row=legend_row + 4, column=1, value="GST Calculations:").font = Font(bold=True)
-        output_sheet.cell(row=legend_row + 5, column=1, value="• CGST (Central GST) @ 9%")
-        output_sheet.cell(row=legend_row + 6, column=1, value="• SGST (State GST) @ 9%")
-        output_sheet.cell(row=legend_row + 7, column=1, value="• Grand Total = Amount + CGST + SGST (Total 18% GST)")
         
         # Save to BytesIO
         output_buffer = io.BytesIO()
