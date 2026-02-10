@@ -3124,31 +3124,14 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         mid_idx = len(sorted_prices) // 2
                         med_price = sorted_prices[mid_idx] if len(sorted_prices) % 2 == 1 else (sorted_prices[mid_idx - 1] + sorted_prices[mid_idx]) / 2
                         
-                        # Calculate market totals based on quantity
+                        # Calculate market totals based on quantity using MINIMUM rate
                         min_total = min_price * quantity
-                        med_total = med_price * quantity
-                        max_total = max_price * quantity
                         
-                        # Calculate GST (CGST @ 9% + SGST @ 9% = 18% total)
-                        cgst_rate = 0.09
-                        sgst_rate = 0.09
-                        
-                        # User's GST calculations
-                        user_cgst = user_amount * cgst_rate
-                        user_sgst = user_amount * sgst_rate
-                        user_grand_total = user_amount + user_cgst + user_sgst
-                        
-                        # Market GST calculations (based on medium rate)
-                        market_cgst = med_total * cgst_rate
-                        market_sgst = med_total * sgst_rate
-                        market_grand_total = med_total + market_cgst + market_sgst
-                        
-                        # Calculate differences (Your Amount - Market Amount)
+                        # Calculate differences (Your Amount - Market Min Amount)
                         # Positive = you're paying MORE than market (bad)
                         # Negative = you're paying LESS than market (good deal)
-                        rate_diff_med = user_rate - med_price if user_rate > 0 else 0
-                        amount_diff_med = user_amount - med_total if user_amount > 0 else 0
-                        grand_total_diff = user_grand_total - market_grand_total if user_amount > 0 else 0
+                        rate_diff = user_rate - min_price if user_rate > 0 else 0
+                        amount_diff = user_amount - min_total if user_amount > 0 else 0
                         
                         # Get vendor/website info from validated results only
                         vendors = []
@@ -3168,19 +3151,10 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "user_rate": round(user_rate, 2),
                             "quantity": quantity,
                             "user_amount": round(user_amount, 2),
-                            "user_cgst": round(user_cgst, 2),
-                            "user_sgst": round(user_sgst, 2),
-                            "user_grand_total": round(user_grand_total, 2),
-                            "min_rate": round(min_price, 2),
-                            "med_rate": round(med_price, 2),
-                            "max_rate": round(max_price, 2),
-                            "med_total": round(med_total, 2),
-                            "market_cgst": round(market_cgst, 2),
-                            "market_sgst": round(market_sgst, 2),
-                            "market_grand_total": round(market_grand_total, 2),
-                            "rate_diff": round(rate_diff_med, 2),
-                            "amount_diff": round(amount_diff_med, 2),
-                            "grand_total_diff": round(grand_total_diff, 2),
+                            "market_min_rate": round(min_price, 2),
+                            "market_min_total": round(min_total, 2),
+                            "rate_diff": round(rate_diff, 2),
+                            "amount_diff": round(amount_diff, 2),
                             "website_links": "\n".join(websites[:5]),
                             "vendor_details": ", ".join(vendors[:10])
                         })
