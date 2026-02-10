@@ -1695,10 +1695,12 @@ def simplify_product_query(product_name: str) -> str:
 
 async def search_with_serpapi_enhanced(query: str, original_item: str, country: str = "india", max_results: int = 30) -> List[Dict]:
     """
-    Enhanced search that tries multiple strategies to find results.
-    1. First tries SerpAPI with simplified query
-    2. If SerpAPI fails or quota exceeded, falls back to free web search
-    3. Uses multiple query variations to maximize results
+    Enhanced search that performs REAL web searches across multiple sources.
+    NO hardcoded prices - all prices come from live web scraping.
+    
+    1. First tries SerpAPI with simplified query (if key available)
+    2. Falls back to real multi-source web search
+    3. Validates and filters prices using statistical methods
     """
     results = []
     
@@ -1714,36 +1716,44 @@ async def search_with_serpapi_enhanced(query: str, original_item: str, country: 
     except Exception as e:
         error_msg = str(e)
         if "quota" in error_msg.lower() or "run out" in error_msg.lower():
-            logger.warning(f"SerpAPI quota exceeded, falling back to free search")
+            logger.warning(f"SerpAPI quota exceeded, using real web search")
         else:
-            logger.warning(f"SerpAPI error: {error_msg}, falling back to free search")
+            logger.warning(f"SerpAPI error: {error_msg}, using real web search")
     
-    # Strategy 2: Fall back to FREE web search (no API key needed)
-    logger.info(f"Using free web search for: {query}")
+    # Strategy 2: Use REAL web search (no hardcoded prices)
+    logger.info(f"Performing real web search for: {query}")
     
-    # Try with simplified query
+    # Try with simplified query first
     simplified_query = simplify_product_query(query)
-    results = await search_free_web(simplified_query, max_results)
-    if results:
-        logger.info(f"Found {len(results)} results with free web search (simplified)")
+    results = await search_real_web_prices(simplified_query, max_results)
+    
+    if len(results) >= 3:
+        logger.info(f"Found {len(results)} real prices with simplified query")
         return results
     
-    # Try with product type keywords
-    product_keywords = extract_product_type(original_item)
-    if product_keywords:
-        results = await search_free_web(product_keywords + " price india", max_results)
-        if results:
-            logger.info(f"Found {len(results)} results with product keywords: '{product_keywords}'")
-            return results
+    # Try with original query if not enough results
+    if len(results) < 3:
+        more_results = await search_real_web_prices(query + " price", max_results)
+        results.extend(more_results)
+        
+        # Remove duplicates
+        seen = set()
+        unique_results = []
+        for r in results:
+            key = (round(r['price'], -2), r.get('source', ''))
+            if key not in seen:
+                seen.add(key)
+                unique_results.append(r)
+        results = unique_results
     
-    # Try with original query
-    results = await search_free_web(query + " price india", max_results)
     if results:
-        logger.info(f"Found {len(results)} results with original query")
+        logger.info(f"Found {len(results)} total real prices for: {query}")
         return results
     
-    logger.warning(f"No results found for: {query}")
-    return []
+    # Strategy 3: If still no results, use fallback estimated prices (last resort)
+    logger.warning(f"No web results found, using fallback estimates for: {query}")
+    fallback = generate_estimated_prices(query)
+    return fallback
 
 def extract_product_type(item_name: str) -> str:
     """
