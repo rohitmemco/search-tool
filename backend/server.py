@@ -3266,19 +3266,21 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     "min_rate": "Error",
                     "med_rate": "Error",
                     "max_rate": "Error",
-                    "min_total": "Error",
                     "med_total": "Error",
-                    "max_total": "Error",
+                    "market_cgst": "Error",
+                    "market_sgst": "Error",
+                    "market_grand_total": "Error",
                     "rate_diff": "Error",
                     "amount_diff": "Error",
+                    "grand_total_diff": "Error",
                     "website_links": f"Error: {error_msg}",
                     "vendor_details": "Error"
                 })
         
-        # Generate output Excel with comparison columns
+        # Generate output Excel with GST calculations
         output_workbook = Workbook()
         output_sheet = output_workbook.active
-        output_sheet.title = "Price Comparison"
+        output_sheet.title = "Price Comparison with GST"
         
         # Define styles
         header_font = Font(bold=True, color="FFFFFF")
@@ -3292,18 +3294,18 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         )
         
         # Colors for comparison highlighting
-        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Good deal - paying less
+        green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Good deal
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")    # Overpaying
         green_font = Font(color="006100")
         red_font = Font(color="9C0006")
+        yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # GST columns
         
-        # Write headers - Your Data | Market Rates | Comparison
+        # Write headers with GST columns
         headers = [
             "SL No", "Item", 
-            "Your Rate (₹)", "Qty", "Your Amount (₹)",  # User's data
-            "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)",  # Market rates
-            "Min Total (₹)", "Med Total (₹)", "Max Total (₹)",  # Market totals
-            "Rate Diff (₹)", "Amount Diff (₹)",  # Comparison
+            "Your Rate (₹)", "Qty", "Your Amount (₹)", "Your CGST @9%", "Your SGST @9%", "Your Grand Total (₹)",
+            "Market Rate (₹)", "Market Amount (₹)", "Market CGST @9%", "Market SGST @9%", "Market Grand Total (₹)",
+            "Rate Diff (₹)", "Grand Total Diff (₹)",
             "Website Links", "Vendor Details"
         ]
         
