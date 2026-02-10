@@ -3780,19 +3780,8 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     if isinstance(value, (int, float)):
                         cell.fill = max_fill
                 
-                # Apply color highlighting for ALL difference columns
-                # Min Diff (H, I), Med Diff (L, M), Max Diff (P, Q)
-                if col_idx in [8, 9, 12, 13, 16, 17]:
-                    if isinstance(value, (int, float)):
-                        if value > 0:  # Positive = You're paying MORE than market (Overpaying)
-                            cell.fill = red_fill
-                            cell.font = red_font
-                        elif value < 0:  # Negative = You're paying LESS than market (Good deal)
-                            cell.fill = green_fill
-                            cell.font = green_font
-        
-        # Adjust column widths (19 columns)
-        column_widths = [8, 32, 12, 6, 14, 12, 13, 12, 14, 12, 13, 12, 14, 12, 13, 12, 14, 40, 35]
+        # Adjust column widths (21 columns)
+        column_widths = [8, 30, 12, 6, 14, 12, 13, 15, 12, 14, 12, 13, 15, 12, 14, 12, 13, 15, 12, 14, 35]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
