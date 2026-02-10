@@ -308,7 +308,7 @@ class TestBulkSearchUpload:
         
         content_disp = response.headers.get('Content-Disposition', '')
         assert 'attachment' in content_disp, f"Expected 'attachment' in Content-Disposition"
-        assert 'PriceNexus_Results' in content_disp, f"Expected 'PriceNexus_Results' in filename"
+        assert 'PriceComparison_Results' in content_disp, f"Expected 'PriceComparison_Results' in filename, got {content_disp}"
         print(f"✓ Content-Disposition header correct: {content_disp}")
 
 
