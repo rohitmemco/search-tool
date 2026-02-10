@@ -1917,107 +1917,107 @@ def generate_estimated_prices(query: str) -> List[Dict]:
         # Electronics - Smartphones (full unit prices)
         'iphone 15 pro max': (140000, 160000, 180000),
         'iphone 15 pro': (120000, 135000, 155000),
-        'iphone 15': (70000, 80000, 95000),
-        'iphone 14': (55000, 65000, 80000),
-        'iphone': (50000, 80000, 150000),
-        'samsung galaxy s24 ultra': (110000, 130000, 150000),
-        'samsung galaxy s24+': (85000, 100000, 115000),
-        'samsung galaxy s24': (65000, 75000, 90000),
-        'samsung galaxy s23': (50000, 60000, 75000),
-        'samsung galaxy': (25000, 50000, 100000),
-        'oneplus 12': (60000, 70000, 85000),
-        'oneplus': (30000, 50000, 80000),
-        'pixel 8 pro': (90000, 105000, 120000),
-        'pixel 8': (65000, 75000, 90000),
-        'pixel': (40000, 60000, 100000),
-        'realme': (12000, 25000, 50000),
-        'redmi': (10000, 18000, 35000),
-        'vivo': (15000, 30000, 60000),
-        'oppo': (18000, 35000, 70000),
+        'iphone 15': (70000, 78000, 85000),
+        'iphone 14': (55000, 62000, 70000),
+        'iphone': (50000, 70000, 90000),
+        'samsung galaxy s24 ultra': (115000, 125000, 135000),
+        'samsung galaxy s24+': (90000, 98000, 108000),
+        'samsung galaxy s24': (68000, 74000, 82000),
+        'samsung galaxy s23': (52000, 58000, 65000),
+        'samsung galaxy': (25000, 45000, 65000),
+        'oneplus 12': (62000, 68000, 75000),
+        'oneplus': (30000, 45000, 60000),
+        'pixel 8 pro': (92000, 100000, 110000),
+        'pixel 8': (68000, 74000, 82000),
+        'pixel': (40000, 55000, 70000),
+        'realme': (12000, 22000, 32000),
+        'redmi': (10000, 16000, 24000),
+        'vivo': (15000, 28000, 42000),
+        'oppo': (18000, 32000, 48000),
         
         # Laptops
-        'macbook pro': (150000, 200000, 350000),
-        'macbook air m3': (100000, 115000, 140000),
-        'macbook air m2': (85000, 100000, 120000),
-        'macbook air': (80000, 100000, 150000),
-        'macbook': (80000, 130000, 300000),
-        'dell xps': (100000, 150000, 250000),
-        'dell inspiron': (45000, 65000, 100000),
-        'dell latitude': (70000, 100000, 180000),
-        'dell laptop': (40000, 70000, 150000),
-        'hp pavilion': (50000, 70000, 100000),
-        'hp spectre': (100000, 140000, 200000),
-        'hp laptop': (35000, 60000, 150000),
-        'lenovo thinkpad': (70000, 100000, 180000),
-        'lenovo ideapad': (40000, 60000, 90000),
-        'lenovo laptop': (35000, 60000, 120000),
-        'asus rog': (80000, 120000, 200000),
-        'asus vivobook': (40000, 55000, 80000),
-        'asus laptop': (35000, 55000, 150000),
+        'macbook pro': (150000, 185000, 220000),
+        'macbook air m3': (105000, 115000, 128000),
+        'macbook air m2': (88000, 98000, 110000),
+        'macbook air': (85000, 100000, 118000),
+        'macbook': (85000, 120000, 160000),
+        'dell xps': (105000, 140000, 175000),
+        'dell inspiron': (48000, 62000, 78000),
+        'dell latitude': (72000, 95000, 120000),
+        'dell laptop': (42000, 65000, 90000),
+        'hp pavilion': (52000, 68000, 85000),
+        'hp spectre': (105000, 135000, 165000),
+        'hp laptop': (38000, 58000, 82000),
+        'lenovo thinkpad': (72000, 95000, 125000),
+        'lenovo ideapad': (42000, 58000, 75000),
+        'lenovo laptop': (38000, 58000, 82000),
+        'asus rog': (85000, 115000, 150000),
+        'asus vivobook': (42000, 55000, 70000),
+        'asus laptop': (38000, 55000, 78000),
         
         # Audio
-        'sony wh-1000xm5': (25000, 30000, 35000),
-        'sony wh 1000xm5': (25000, 30000, 35000),  # Without hyphen
-        'wh-1000xm5': (25000, 30000, 35000),
-        'wh 1000xm5': (25000, 30000, 35000),  # Without hyphen
-        'sony wh-1000xm4': (20000, 25000, 30000),
-        'sony wh 1000xm4': (20000, 25000, 30000),  # Without hyphen
-        'wh-1000xm4': (20000, 25000, 30000),
-        'wh 1000xm4': (20000, 25000, 30000),  # Without hyphen
-        'sony headphones': (15000, 25000, 35000),
-        'airpods pro': (20000, 25000, 30000),
-        'airpods': (12000, 18000, 25000),
-        'bose headphones': (18000, 28000, 40000),
-        'jbl speaker': (5000, 15000, 40000),
-        'headphones': (2000, 8000, 30000),
-        'earbuds': (1500, 5000, 20000),
+        'sony wh-1000xm5': (26000, 29000, 33000),
+        'sony wh 1000xm5': (26000, 29000, 33000),  # Without hyphen
+        'wh-1000xm5': (26000, 29000, 33000),
+        'wh 1000xm5': (26000, 29000, 33000),  # Without hyphen
+        'sony wh-1000xm4': (21000, 24000, 28000),
+        'sony wh 1000xm4': (21000, 24000, 28000),  # Without hyphen
+        'wh-1000xm4': (21000, 24000, 28000),
+        'wh 1000xm4': (21000, 24000, 28000),  # Without hyphen
+        'sony headphones': (16000, 24000, 32000),
+        'airpods pro': (21000, 24000, 28000),
+        'airpods': (13000, 17000, 22000),
+        'bose headphones': (20000, 28000, 36000),
+        'jbl speaker': (6000, 14000, 25000),
+        'headphones': (3000, 8000, 15000),
+        'earbuds': (2000, 5000, 10000),
         
         # TVs
-        'lg oled': (100000, 150000, 300000),
-        'samsung tv 65': (80000, 120000, 200000),
-        'samsung tv 55': (50000, 75000, 120000),
-        'samsung tv': (30000, 60000, 150000),
-        'sony bravia': (50000, 90000, 200000),
-        'tv 55 inch': (35000, 55000, 100000),
-        'tv 43 inch': (25000, 40000, 70000),
-        'smart tv': (20000, 40000, 100000),
+        'lg oled': (105000, 145000, 195000),
+        'samsung tv 65': (85000, 115000, 150000),
+        'samsung tv 55': (55000, 72000, 92000),
+        'samsung tv': (32000, 58000, 85000),
+        'sony bravia': (55000, 85000, 125000),
+        'tv 55 inch': (38000, 55000, 75000),
+        'tv 43 inch': (28000, 38000, 52000),
+        'smart tv': (22000, 38000, 58000),
         
         # Kitchen Appliances (full unit prices)
-        'sink': (5000, 15000, 50000),
-        'kitchen sink': (5000, 15000, 50000),
-        'carysil': (8000, 25000, 75000),
-        'franke': (12000, 35000, 100000),
-        'refrigerator': (18000, 40000, 180000),
-        'fridge': (18000, 40000, 180000),
-        'bosch refrigerator': (25000, 55000, 200000),
-        'bosch': (25000, 55000, 200000),
-        'lg refrigerator': (25000, 50000, 150000),
-        'samsung refrigerator': (28000, 55000, 180000),
-        'chimney': (8000, 22000, 70000),
-        'hob': (12000, 28000, 90000),
-        'microwave': (6000, 18000, 55000),
-        'dishwasher': (30000, 55000, 120000),
-        'oven': (15000, 35000, 100000),
-        'water purifier': (8000, 18000, 45000),
-        'washing machine': (15000, 30000, 80000),
-        'air conditioner': (30000, 50000, 100000),
-        'ac': (25000, 45000, 90000),
+        'sink': (6000, 14000, 25000),
+        'kitchen sink': (6000, 14000, 25000),
+        'carysil': (10000, 22000, 38000),
+        'franke': (15000, 32000, 55000),
+        'refrigerator': (20000, 38000, 65000),
+        'fridge': (20000, 38000, 65000),
+        'bosch refrigerator': (28000, 52000, 85000),
+        'bosch': (28000, 52000, 85000),
+        'lg refrigerator': (28000, 48000, 75000),
+        'samsung refrigerator': (30000, 52000, 80000),
+        'chimney': (10000, 20000, 35000),
+        'hob': (14000, 26000, 42000),
+        'microwave': (8000, 16000, 28000),
+        'dishwasher': (32000, 52000, 78000),
+        'oven': (18000, 32000, 52000),
+        'water purifier': (10000, 18000, 30000),
+        'washing machine': (18000, 28000, 48000),
+        'air conditioner': (32000, 48000, 72000),
+        'ac': (28000, 45000, 68000),
         
         # Construction Materials (per unit/sq ft - these are typically multiplied)
-        'plywood': (80, 180, 450),  # per sq ft
-        'ply': (80, 180, 450),
-        'bwp': (100, 200, 500),  # BWP plywood per sq ft
-        'laminate': (40, 100, 280),  # per sq ft
-        'quartz': (250, 500, 1200),  # per sq ft
-        'quartz stone': (250, 500, 1200),
-        'granite': (120, 300, 750),  # per sq ft
-        'marble': (180, 450, 1000),  # per sq ft
-        'counter top': (300, 600, 1500),  # per sq ft for fabricated
-        'countertop': (300, 600, 1500),
-        'tile': (45, 120, 350),  # per sq ft
-        'tiles': (45, 120, 350),
-        'dado': (80, 150, 350),  # per sq ft
-        'wall dado': (80, 150, 350),
+        'plywood': (85, 165, 280),  # per sq ft
+        'ply': (85, 165, 280),
+        'bwp': (110, 185, 320),  # BWP plywood per sq ft
+        'laminate': (45, 95, 175),  # per sq ft
+        'quartz': (280, 480, 750),  # per sq ft
+        'quartz stone': (280, 480, 750),
+        'granite': (140, 280, 450),  # per sq ft
+        'marble': (200, 420, 680),  # per sq ft
+        'counter top': (350, 580, 900),  # per sq ft for fabricated
+        'countertop': (350, 580, 900),
+        'tile': (55, 110, 200),  # per sq ft
+        'tiles': (55, 110, 200),
+        'dado': (90, 145, 240),  # per sq ft
+        'wall dado': (90, 145, 240),
         'flooring': (60, 150, 400),  # per sq ft
         
         # Kitchen Cabinets & Furniture
