@@ -3638,15 +3638,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         min_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")  # Min section - light green
         med_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # Med section - light yellow
         max_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")  # Max section - light orange
+        adjusted_fill = PatternFill(start_color="E6E6FA", end_color="E6E6FA", fill_type="solid")  # Lavender for adjusted prices
         
-        # Headers with Min, Med, Max rate columns + Diff columns for each
+        # Headers with Min, Med, Max rate columns + Source info + Diff columns
         headers = [
             "SL No", "Item", 
             "Your Rate (₹)", "Qty", "Your Amount (₹)",
-            "Min Rate (₹)", "Min Amount (₹)", "Rate Diff (Min) (₹)", "Amount Diff (Min) (₹)",
-            "Med Rate (₹)", "Med Amount (₹)", "Rate Diff (Med) (₹)", "Amount Diff (Med) (₹)",
-            "Max Rate (₹)", "Max Amount (₹)", "Rate Diff (Max) (₹)", "Amount Diff (Max) (₹)",
-            "Website Links", "Vendor Details"
+            "Min Rate (₹)", "Min Amount (₹)", "Min Source", "Rate Diff (Min) (₹)", "Amount Diff (Min) (₹)",
+            "Med Rate (₹)", "Med Amount (₹)", "Med Source", "Rate Diff (Med) (₹)", "Amount Diff (Med) (₹)",
+            "Max Rate (₹)", "Max Amount (₹)", "Max Source", "Rate Diff (Max) (₹)", "Amount Diff (Max) (₹)",
+            "All Sources"
         ]
         
         # Write column headers (row 1)
@@ -3657,11 +3658,11 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             cell.alignment = header_alignment
             cell.border = thin_border
             # Color-code market rate columns
-            if 'Min' in header:
+            if 'Min' in header and 'Source' not in header:
                 cell.fill = PatternFill(start_color="548235", end_color="548235", fill_type="solid")
-            elif 'Med' in header:
+            elif 'Med' in header and 'Source' not in header:
                 cell.fill = PatternFill(start_color="BF8F00", end_color="BF8F00", fill_type="solid")
-            elif 'Max' in header:
+            elif 'Max' in header and 'Source' not in header:
                 cell.fill = PatternFill(start_color="C65911", end_color="C65911", fill_type="solid")
         
         # Calculate totals while writing data
@@ -3669,6 +3670,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         total_market_min_amount = 0
         total_market_med_amount = 0
         total_market_max_amount = 0
+        
+        # Collect all sources for Sources sheet
+        all_item_sources = []
         
         # Write data (starting row 2)
         for row_idx, result in enumerate(results, start=2):
@@ -3682,6 +3686,17 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             if isinstance(result.get('market_max_total'), (int, float)):
                 total_market_max_amount += result['market_max_total']
             
+            # Collect sources for Sources sheet
+            if result.get('all_sources'):
+                for src in result['all_sources']:
+                    all_item_sources.append({
+                        'item': result['item'],
+                        'price': src.get('price', 0),
+                        'vendor': src.get('vendor', 'Unknown'),
+                        'url': src.get('website', ''),
+                        'timestamp': result.get('search_timestamp', '')
+                    })
+            
             data = [
                 result['sl_no'],                              # A - SL No
                 result['item'],                               # B - Item
@@ -3690,34 +3705,74 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 result['user_amount'],                        # E - Your Amount
                 result.get('market_min_rate', 'N/A'),         # F - Min Rate
                 result.get('market_min_total', 'N/A'),        # G - Min Amount
-                result.get('rate_diff_min', 'N/A'),           # H - Rate Diff (Min)
-                result.get('amount_diff_min', 'N/A'),         # I - Amount Diff (Min)
-                result.get('market_med_rate', 'N/A'),         # J - Med Rate
-                result.get('market_med_total', 'N/A'),        # K - Med Amount
-                result.get('rate_diff_med', 'N/A'),           # L - Rate Diff (Med)
-                result.get('amount_diff_med', 'N/A'),         # M - Amount Diff (Med)
-                result.get('market_max_rate', 'N/A'),         # N - Max Rate
-                result.get('market_max_total', 'N/A'),        # O - Max Amount
-                result.get('rate_diff_max', 'N/A'),           # P - Rate Diff (Max)
-                result.get('amount_diff_max', 'N/A'),         # Q - Amount Diff (Max)
-                result['website_links'],                      # R - Website Links
-                result['vendor_details']                      # S - Vendor Details
+                result.get('min_source', 'N/A'),              # H - Min Source
+                result.get('rate_diff_min', 'N/A'),           # I - Rate Diff (Min)
+                result.get('amount_diff_min', 'N/A'),         # J - Amount Diff (Min)
+                result.get('market_med_rate', 'N/A'),         # K - Med Rate
+                result.get('market_med_total', 'N/A'),        # L - Med Amount
+                result.get('med_source', 'N/A'),              # M - Med Source
+                result.get('rate_diff_med', 'N/A'),           # N - Rate Diff (Med)
+                result.get('amount_diff_med', 'N/A'),         # O - Amount Diff (Med)
+                result.get('market_max_rate', 'N/A'),         # P - Max Rate
+                result.get('market_max_total', 'N/A'),        # Q - Max Amount
+                result.get('max_source', 'N/A'),              # R - Max Source
+                result.get('rate_diff_max', 'N/A'),           # S - Rate Diff (Max)
+                result.get('amount_diff_max', 'N/A'),         # T - Amount Diff (Max)
+                result.get('vendor_details', '')              # U - All Sources
             ]
             
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
                 
-                # Number columns - right align (all numeric columns: C-Q)
-                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]:
+                # Number columns - right align (all numeric columns)
+                if col_idx in [3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 18:  # Website links - wrap text
+                elif col_idx in [8, 13, 18, 21]:  # Source columns - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
                 
                 # Color-code market rate columns with light backgrounds
                 if col_idx in [6, 7]:  # Min Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = min_fill
+                elif col_idx in [11, 12]:  # Med Rate & Amount columns
+                    if isinstance(value, (int, float)):
+                        cell.fill = med_fill
+                elif col_idx in [16, 17]:  # Max Rate & Amount columns
+                    if isinstance(value, (int, float)):
+                        cell.fill = max_fill
+                
+                # Apply color highlighting for ALL difference columns
+                # Min Diff (I, J), Med Diff (N, O), Max Diff (S, T)
+                if col_idx in [9, 10, 14, 15, 19, 20]:
+                    if isinstance(value, (int, float)):
+                        if value > 0:  # Positive = You're paying MORE than market (Overpaying)
+                            cell.fill = red_fill
+                            cell.font = red_font
+                        elif value < 0:  # Negative = You're paying LESS than market (Good deal)
+                            cell.fill = green_fill
+                            cell.font = green_font
+            
+            # Flag row highlighting
+            user_rate = result.get('user_rate', 0)
+            min_rate = result.get('market_min_rate', 0)
+            max_rate = result.get('market_max_rate', 0)
+            
+            if isinstance(user_rate, (int, float)) and isinstance(min_rate, (int, float)):
+                if user_rate < min_rate:
+                    # Good deal - highlight row lightly
+                    for col in range(1, 22):
+                        cell = output_sheet.cell(row=row_idx, column=col)
+                        if not cell.fill.start_color.index or cell.fill.start_color.index == '00000000':
+                            cell.fill = green_fill
+            
+            if isinstance(user_rate, (int, float)) and isinstance(max_rate, (int, float)):
+                if user_rate > max_rate:
+                    # Bad - overpaying beyond max
+                    for col in [2]:  # Highlight item name
+                        cell = output_sheet.cell(row=row_idx, column=col)
+                        cell.fill = red_fill
+                        cell.font = Font(bold=True, color="9C0006")
                 elif col_idx in [10, 11]:  # Med Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = med_fill
