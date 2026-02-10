@@ -1733,45 +1733,66 @@ def extract_product_type(item_name: str) -> str:
     """
     item_lower = item_name.lower()
     
-    # Common product type mappings
-    product_types = {
-        'sink': 'kitchen sink',
-        'refrigerator': 'refrigerator',
-        'fridge': 'refrigerator',
-        'ply': 'plywood',
-        'plywood': 'plywood',
-        'counter': 'kitchen counter top',
-        'quartz': 'quartz stone',
-        'dado': 'wall tiles',
-        'cabinet': 'kitchen cabinet',
-        'chimney': 'kitchen chimney',
-        'hob': 'kitchen hob',
-        'mixer': 'mixer grinder',
-        'tap': 'kitchen tap',
-        'faucet': 'kitchen faucet',
-        'granite': 'granite slab',
-        'marble': 'marble slab',
-        'tile': 'tiles',
-        'laminate': 'laminate sheet',
-        'hardware': 'kitchen hardware',
-        'drawer': 'kitchen drawer',
-        'shutter': 'kitchen shutter',
+    # Common product type mappings - use word boundaries
+    product_types = [
+        ('sink', 'kitchen sink'),
+        ('refrigerator', 'refrigerator'),
+        ('fridge', 'refrigerator'),
+        ('plywood', 'plywood'),
+        (' ply ', 'plywood'),  # space around to avoid matching "supply"
+        ('counter top', 'kitchen counter top'),
+        ('countertop', 'kitchen counter top'),
+        ('quartz stone', 'quartz stone slab'),
+        ('quartz', 'quartz stone'),
+        ('dado', 'wall dado tiles'),
+        ('cabinet', 'kitchen cabinet'),
+        ('chimney', 'kitchen chimney'),
+        ('hob', 'kitchen hob'),
+        ('mixer', 'mixer grinder'),
+        ('tap', 'kitchen tap'),
+        ('faucet', 'kitchen faucet'),
+        ('granite', 'granite slab'),
+        ('marble', 'marble slab'),
+        ('tile', 'tiles'),
+        ('laminate', 'laminate sheet'),
+        ('hardware', 'kitchen hardware'),
+        ('drawer', 'kitchen drawer'),
+        ('shutter', 'kitchen shutter'),
+        ('modular', 'modular kitchen'),
+    ]
+    
+    # Brand mappings
+    brand_products = {
         'bosch': 'bosch appliance',
         'carysil': 'carysil sink',
         'franke': 'franke sink',
+        'lg': 'lg appliance',
+        'samsung': 'samsung appliance',
+        'whirlpool': 'whirlpool appliance',
+        'godrej': 'godrej appliance',
+        'haier': 'haier appliance',
+        'ifb': 'ifb appliance',
+        'siemens': 'siemens appliance',
     }
     
-    for keyword, product_type in product_types.items():
-        if keyword in item_lower:
-            # Add brand if present
-            brands = ['bosch', 'carysil', 'franke', 'lg', 'samsung', 'whirlpool', 'godrej', 'haier']
-            for brand in brands:
-                if brand in item_lower:
+    # Check for brand first
+    for brand, default_product in brand_products.items():
+        if brand in item_lower:
+            # Find what product it is
+            for keyword, product_type in product_types:
+                if keyword in item_lower:
                     return f"{brand} {product_type}"
+            return default_product
+    
+    # Check product types
+    for keyword, product_type in product_types:
+        if keyword in item_lower:
             return product_type
     
-    # Fallback: return first few words
-    words = item_name.split()[:3]
+    # Fallback: return cleaned first few words
+    import re
+    cleaned = re.sub(r'[^\w\s]', ' ', item_name)
+    words = cleaned.split()[:4]
     return ' '.join(words)
 
 # ================== REAL SERPAPI SEARCH ==================
