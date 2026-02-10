@@ -2783,13 +2783,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
 
 @api_router.get("/bulk-search/template")
 async def download_template():
-    """Download a sample Excel template for bulk search with SL No and Item columns"""
+    """Download a sample Excel template for bulk search with SL No, Item and Quantity columns"""
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Items"
     
-    # Headers - matching user's format
-    headers = ["SL No", "Item"]
+    # Headers - matching user's format with Quantity
+    headers = ["SL No", "Item", "Quantity"]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4A90D9", end_color="4A90D9", fill_type="solid")
     
@@ -2798,13 +2798,13 @@ async def download_template():
         cell.font = header_font
         cell.fill = header_fill
     
-    # Sample data
+    # Sample data with quantities
     sample_data = [
-        [1, "iPhone 15 Pro"],
-        [2, "Samsung Galaxy S24"],
-        [3, "Sony WH-1000XM5 Headphones"],
-        [4, "MacBook Air M3"],
-        [5, "Dell XPS 15 Laptop"],
+        [1, "iPhone 15 Pro", 5],
+        [2, "Samsung Galaxy S24", 10],
+        [3, "Sony WH-1000XM5 Headphones", 3],
+        [4, "MacBook Air M3", 2],
+        [5, "Dell XPS 15 Laptop", 4],
     ]
     
     for row_idx, data in enumerate(sample_data, start=2):
@@ -2814,12 +2814,14 @@ async def download_template():
     # Adjust column widths
     sheet.column_dimensions['A'].width = 10
     sheet.column_dimensions['B'].width = 40
+    sheet.column_dimensions['C'].width = 12
     
     # Add instructions
     sheet.cell(row=9, column=1, value="Instructions:").font = Font(bold=True)
     sheet.cell(row=10, column=1, value="1. Add serial numbers in Column A (SL No)")
     sheet.cell(row=11, column=1, value="2. Add item/product names in Column B (Item)")
-    sheet.cell(row=12, column=1, value="3. Save and upload this file to get price results")
+    sheet.cell(row=12, column=1, value="3. Add quantity in Column C (Quantity) - defaults to 1 if not provided")
+    sheet.cell(row=13, column=1, value="4. Save and upload this file to get price results")
     
     # Save to BytesIO
     output_buffer = io.BytesIO()
