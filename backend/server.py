@@ -2740,13 +2740,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
-                if col_idx in [3, 4, 5]:  # Price columns
+                if col_idx in [3, 4, 5, 6, 7, 8, 9]:  # Quantity and Price columns
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 6:  # Website links - wrap text
+                elif col_idx == 10:  # Website links - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
         
-        # Adjust column widths
-        column_widths = [10, 40, 15, 15, 15, 60, 50]
+        # Adjust column widths for new layout
+        column_widths = [10, 35, 10, 15, 15, 15, 15, 15, 15, 55, 45]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
