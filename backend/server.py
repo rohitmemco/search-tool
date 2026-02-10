@@ -1894,12 +1894,74 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
 def generate_estimated_prices(query: str) -> List[Dict]:
     """
     Generate estimated market prices based on product category.
-    Uses average market prices for common construction/kitchen items.
+    Uses average market prices for common products in INR.
     """
     query_lower = query.lower()
     
     # Price ranges for common products (min, typical, max) in INR
     price_ranges = {
+        # Electronics - Smartphones (full unit prices)
+        'iphone 15 pro max': (140000, 160000, 180000),
+        'iphone 15 pro': (120000, 135000, 155000),
+        'iphone 15': (70000, 80000, 95000),
+        'iphone 14': (55000, 65000, 80000),
+        'iphone': (50000, 80000, 150000),
+        'samsung galaxy s24 ultra': (110000, 130000, 150000),
+        'samsung galaxy s24+': (85000, 100000, 115000),
+        'samsung galaxy s24': (65000, 75000, 90000),
+        'samsung galaxy s23': (50000, 60000, 75000),
+        'samsung galaxy': (25000, 50000, 100000),
+        'oneplus 12': (60000, 70000, 85000),
+        'oneplus': (30000, 50000, 80000),
+        'pixel 8 pro': (90000, 105000, 120000),
+        'pixel 8': (65000, 75000, 90000),
+        'pixel': (40000, 60000, 100000),
+        'realme': (12000, 25000, 50000),
+        'redmi': (10000, 18000, 35000),
+        'vivo': (15000, 30000, 60000),
+        'oppo': (18000, 35000, 70000),
+        
+        # Laptops
+        'macbook pro': (150000, 200000, 350000),
+        'macbook air m3': (100000, 115000, 140000),
+        'macbook air m2': (85000, 100000, 120000),
+        'macbook air': (80000, 100000, 150000),
+        'macbook': (80000, 130000, 300000),
+        'dell xps': (100000, 150000, 250000),
+        'dell inspiron': (45000, 65000, 100000),
+        'dell latitude': (70000, 100000, 180000),
+        'dell laptop': (40000, 70000, 150000),
+        'hp pavilion': (50000, 70000, 100000),
+        'hp spectre': (100000, 140000, 200000),
+        'hp laptop': (35000, 60000, 150000),
+        'lenovo thinkpad': (70000, 100000, 180000),
+        'lenovo ideapad': (40000, 60000, 90000),
+        'lenovo laptop': (35000, 60000, 120000),
+        'asus rog': (80000, 120000, 200000),
+        'asus vivobook': (40000, 55000, 80000),
+        'asus laptop': (35000, 55000, 150000),
+        
+        # Audio
+        'sony wh-1000xm5': (25000, 30000, 35000),
+        'sony wh-1000xm4': (20000, 25000, 30000),
+        'sony headphones': (15000, 25000, 35000),
+        'airpods pro': (20000, 25000, 30000),
+        'airpods': (12000, 18000, 25000),
+        'bose headphones': (18000, 28000, 40000),
+        'jbl speaker': (5000, 15000, 40000),
+        'headphones': (2000, 8000, 30000),
+        'earbuds': (1500, 5000, 20000),
+        
+        # TVs
+        'lg oled': (100000, 150000, 300000),
+        'samsung tv 65': (80000, 120000, 200000),
+        'samsung tv 55': (50000, 75000, 120000),
+        'samsung tv': (30000, 60000, 150000),
+        'sony bravia': (50000, 90000, 200000),
+        'tv 55 inch': (35000, 55000, 100000),
+        'tv 43 inch': (25000, 40000, 70000),
+        'smart tv': (20000, 40000, 100000),
+        
         # Kitchen Appliances (full unit prices)
         'sink': (5000, 15000, 50000),
         'kitchen sink': (5000, 15000, 50000),
@@ -1909,14 +1971,17 @@ def generate_estimated_prices(query: str) -> List[Dict]:
         'fridge': (18000, 40000, 180000),
         'bosch refrigerator': (25000, 55000, 200000),
         'bosch': (25000, 55000, 200000),
-        'lg': (20000, 45000, 150000),
-        'samsung': (22000, 50000, 180000),
+        'lg refrigerator': (25000, 50000, 150000),
+        'samsung refrigerator': (28000, 55000, 180000),
         'chimney': (8000, 22000, 70000),
         'hob': (12000, 28000, 90000),
         'microwave': (6000, 18000, 55000),
         'dishwasher': (30000, 55000, 120000),
         'oven': (15000, 35000, 100000),
         'water purifier': (8000, 18000, 45000),
+        'washing machine': (15000, 30000, 80000),
+        'air conditioner': (30000, 50000, 100000),
+        'ac': (25000, 45000, 90000),
         
         # Construction Materials (per unit/sq ft - these are typically multiplied)
         'plywood': (80, 180, 450),  # per sq ft
