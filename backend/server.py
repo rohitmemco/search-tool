@@ -2713,8 +2713,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']} (Qty: {product_info['quantity']})")
                 
                 # Search using SerpAPI
-                search_results = await search_with_serpapi(
+                search_results = await search_with_serpapi_enhanced(
                     query=product_info['query'],
+                    original_item=product_info['item'],
                     country="india",
                     max_results=30  # Get more results for better price validation
                 )
