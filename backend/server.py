@@ -3493,6 +3493,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             if website and website not in websites:
                                 websites.append(website)
                         
+                        # Find specific source for each price point (min, med, max)
+                        sorted_validated = sorted(validated_prices, key=lambda x: x['price'])
+                        min_source_item = sorted_validated[0]
+                        max_source_item = sorted_validated[-1]
+                        mid_idx_src = len(sorted_validated) // 2
+                        med_source_item = sorted_validated[mid_idx_src]
+                        
                         results.append({
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
@@ -3501,18 +3508,28 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "user_amount": round(user_amount, 2),
                             "market_min_rate": round(min_price, 2),
                             "market_min_total": round(min_total, 2),
+                            "min_source": min_source_item.get('vendor', 'Unknown'),
+                            "min_url": min_source_item.get('website', ''),
                             "rate_diff_min": round(rate_diff_min, 2),
                             "amount_diff_min": round(amount_diff_min, 2),
                             "market_med_rate": round(med_price, 2),
                             "market_med_total": round(med_total, 2),
+                            "med_source": med_source_item.get('vendor', 'Unknown'),
+                            "med_url": med_source_item.get('website', ''),
                             "rate_diff_med": round(rate_diff_med, 2),
                             "amount_diff_med": round(amount_diff_med, 2),
                             "market_max_rate": round(max_price, 2),
                             "market_max_total": round(max_total, 2),
+                            "max_source": max_source_item.get('vendor', 'Unknown'),
+                            "max_url": max_source_item.get('website', ''),
                             "rate_diff_max": round(rate_diff_max, 2),
                             "amount_diff_max": round(amount_diff_max, 2),
                             "website_links": "\n".join(websites[:5]),
-                            "vendor_details": ", ".join(vendors[:10])
+                            "vendor_details": ", ".join(vendors[:10]),
+                            "all_sources": validated_prices,  # For Sources sheet
+                            "search_timestamp": datetime.now().isoformat(),
+                            "price_adjusted": False,
+                            "adjustment_note": ""
                         })
                     else:
                         # No validated prices
