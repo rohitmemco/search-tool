@@ -38,28 +38,26 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **Fully Dynamic Search**: Removed all predefined category mappings - searches ONLY by product/brand name in store names
 - ✅ **Comprehensive Testing**: 25+ backend tests created and all passed
 
-### Feb 10, 2026 - Bulk Excel Upload Feature with Full Diff Columns ✅ COMPLETE
-- ✅ **Upload Excel**: Users can upload Excel file with product names, rates, and quantities
-- ✅ **Output Excel Columns (19 total)**:
+### Feb 10, 2026 - Bulk Excel Upload with Real Web Search ✅ COMPLETE
+- ✅ **Real Web Search Implementation**: 
+  - Searches across Bing, DuckDuckGo, Google, and e-commerce sites (Amazon, Flipkart, Croma)
+  - Extracts prices from search results with improved pattern matching
+  - Validates prices using IQR statistical method to filter outliers
+  - Falls back to category-based estimates when web search returns insufficient results
+- ✅ **Output Excel Structure (21 columns)**:
   - Item Details: SL No, Item
   - Your Data: Your Rate, Qty, Your Amount
-  - Market MINIMUM: Min Rate, Min Amount, **Rate Diff (Min)**, **Amount Diff (Min)**
-  - Market MEDIUM: Med Rate, Med Amount, **Rate Diff (Med)**, **Amount Diff (Med)**
-  - Market MAXIMUM: Max Rate, Max Amount, **Rate Diff (Max)**, **Amount Diff (Max)**
-  - Sources: Website Links, Vendor Details
-- ✅ **Diff Calculations for ALL Rate Types**:
-  - Rate Diff = Your Rate - Market Rate
-  - Amount Diff = Your Amount - Market Amount
-  - Applied for Min, Med, and Max (not just Min)
-- ✅ **Realistic Max Price Ranges** (Updated Feb 10):
-  - Samsung Galaxy S24: ₹68K - ₹74K - ₹82K
-  - MacBook Air M3: ₹105K - ₹115K - ₹128K
-  - Sony WH-1000XM5: ₹26K - ₹29K - ₹33K
-- ✅ **Color Highlighting**:
-  - **Red** = Overpaying (positive diff: Your rate > Market rate)
-  - **Green** = Good Deal (negative diff: Your rate < Market rate)
-- ✅ **Consolidated GST Summary** with FOUR sections (Your, Min, Med, Max)
-- ✅ **Testing**: 10 backend tests passed (updated max prices verified)
+  - Market MINIMUM: Min Rate, Min Amount, **Min Source**, Rate Diff, Amount Diff
+  - Market MEDIUM: Med Rate, Med Amount, **Med Source**, Rate Diff, Amount Diff  
+  - Market MAXIMUM: Max Rate, Max Amount, **Max Source**, Rate Diff, Amount Diff
+  - All Sources column
+- ✅ **Sources Sheet for Traceability**: Lists all detected prices with Item, Price, Vendor, URL, Timestamp
+- ✅ **Row Highlighting**: 
+  - Green highlight: Your rate < Min (good deal)
+  - Red highlight: Your rate > Max (overpaying)
+- ✅ **GST Summary**: FOUR sections (Your, Min, Med, Max) with CGST @9%, SGST @9%, Grand Total
+
+**LIMITATION**: Free web scraping often blocked by anti-bot measures. For accurate real-time prices, provide a valid **SerpAPI key** in `/app/backend/.env`.
 
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
