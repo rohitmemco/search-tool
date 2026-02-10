@@ -3124,11 +3124,18 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         mid_idx = len(sorted_prices) // 2
                         med_price = sorted_prices[mid_idx] if len(sorted_prices) % 2 == 1 else (sorted_prices[mid_idx - 1] + sorted_prices[mid_idx]) / 2
                         
-                        # Calculate quantity-wise totals
-                        quantity = product_info['quantity']
+                        # Calculate market totals based on quantity
                         min_total = min_price * quantity
                         med_total = med_price * quantity
                         max_total = max_price * quantity
+                        
+                        # Calculate differences (Your Amount - Market Amount)
+                        # Positive = you're paying MORE than market (bad)
+                        # Negative = you're paying LESS than market (good deal)
+                        rate_diff_min = user_rate - min_price if user_rate > 0 else 0
+                        rate_diff_med = user_rate - med_price if user_rate > 0 else 0
+                        amount_diff_min = user_amount - min_total if user_amount > 0 else 0
+                        amount_diff_med = user_amount - med_total if user_amount > 0 else 0
                         
                         # Get vendor/website info from validated results only
                         vendors = []
@@ -3145,28 +3152,36 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         results.append({
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
+                            "user_rate": round(user_rate, 2),
                             "quantity": quantity,
+                            "user_amount": round(user_amount, 2),
                             "min_rate": round(min_price, 2),
                             "med_rate": round(med_price, 2),
                             "max_rate": round(max_price, 2),
                             "min_total": round(min_total, 2),
                             "med_total": round(med_total, 2),
                             "max_total": round(max_total, 2),
-                            "website_links": "\n".join(websites[:5]),  # Top 5 website links
-                            "vendor_details": ", ".join(vendors[:10])  # Top 10 vendors
+                            "rate_diff": round(rate_diff_med, 2),  # Diff vs medium market rate
+                            "amount_diff": round(amount_diff_med, 2),  # Diff vs medium market total
+                            "website_links": "\n".join(websites[:5]),
+                            "vendor_details": ", ".join(vendors[:10])
                         })
                     else:
                         # No validated prices
                         results.append({
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
-                            "quantity": product_info['quantity'],
+                            "user_rate": round(user_rate, 2),
+                            "quantity": quantity,
+                            "user_amount": round(user_amount, 2),
                             "min_rate": "N/A",
                             "med_rate": "N/A",
                             "max_rate": "N/A",
                             "min_total": "N/A",
                             "med_total": "N/A",
                             "max_total": "N/A",
+                            "rate_diff": "N/A",
+                            "amount_diff": "N/A",
                             "website_links": "No valid prices found",
                             "vendor_details": "No valid prices found"
                         })
@@ -3174,7 +3189,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     results.append({
                         "sl_no": product_info['sl_no'],
                         "item": product_info['item'],
-                        "quantity": product_info['quantity'],
+                        "user_rate": round(user_rate, 2),
+                        "quantity": quantity,
+                        "user_amount": round(user_amount, 2),
                         "min_rate": "N/A",
                         "med_rate": "N/A",
                         "max_rate": "N/A",
