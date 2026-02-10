@@ -2359,8 +2359,8 @@ def extract_price_from_text(text: str) -> float:
     return 0
 
 def extract_vendor_from_url(url: str) -> str:
-    """Extract vendor name from URL"""
-    from urllib.parse import urlparse
+    """Extract vendor name from URL, including handling redirect URLs"""
+    from urllib.parse import urlparse, unquote, parse_qs
     
     vendor_mappings = {
         'amazon': 'Amazon',
@@ -2384,10 +2384,45 @@ def extract_vendor_from_url(url: str) -> str:
         'urban': 'Urban Ladder',
         'godrej': 'Godrej',
         'ikea': 'IKEA',
+        'smartprix': 'Smartprix',
+        'digit': 'Digit',
+        '91mobiles': '91mobiles',
+        'pricehistory': 'PriceHistory',
+        'gadgets360': 'Gadgets360',
+        'gsmarena': 'GSMArena',
+        'mysmartprice': 'MySmartPrice',
+        'pricebaba': 'PriceBaba',
+        'apple': 'Apple Store',
+        'samsung': 'Samsung Store',
+        'oneplus': 'OnePlus Store',
     }
     
     try:
+        # Handle DuckDuckGo redirect URLs
+        if 'duckduckgo.com' in url:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            if 'uddg' in params:
+                url = unquote(params['uddg'][0])
+        
+        # Handle Bing redirect URLs
+        if 'bing.com' in url and '/ck/a' in url:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            if 'u' in params:
+                url = unquote(params['u'][0])
+        
+        # Handle Google redirect URLs  
+        if 'google.com/url' in url:
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            if 'url' in params:
+                url = unquote(params['url'][0])
+            elif 'q' in params:
+                url = unquote(params['q'][0])
+        
         domain = urlparse(url).netloc.lower()
+        domain = domain.replace('www.', '')
         for key, vendor in vendor_mappings.items():
             if key in domain:
                 return vendor
