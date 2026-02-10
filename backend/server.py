@@ -1922,7 +1922,7 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
 def generate_search_results(product_data: Dict, location_data: Dict, currency_info: Dict, source_type: str, count: int = 15) -> List[Dict]:
     """Generate realistic search results with vendor details"""
     results = []
-    marketplaces = get_marketplaces_for_region(location_data["country"], source_type)
+    marketplaces = get_fallback_marketplaces(location_data["country"], source_type)
     
     products = product_data.get("products", [])
     brands = product_data.get("brands", [])
