@@ -1818,8 +1818,15 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
     """
     Free web search for product prices using multiple methods.
     No API key required.
+    Primary source is estimated prices based on product category,
+    supplemented by web scraping when reliable.
     """
     products = []
+    
+    # FIRST: Generate estimated prices based on product category (reliable baseline)
+    estimated = generate_estimated_prices(query)
+    products.extend(estimated)
+    logger.info(f"Generated {len(estimated)} estimated prices for: {query}")
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1840,6 +1847,17 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
                 if response.status_code == 200:
                     soup = BeautifulSoup(response.text, 'lxml')
                     
+                    # Calculate expected price range from estimated prices
+                    if estimated:
+                        estimated_min = min(p['price'] for p in estimated)
+                        estimated_max = max(p['price'] for p in estimated)
+                        # Accept web prices within 50% of estimated range
+                        valid_price_min = estimated_min * 0.5
+                        valid_price_max = estimated_max * 2.0
+                    else:
+                        valid_price_min = 100
+                        valid_price_max = 10000000
+                    
                     # Find all search results
                     for result in soup.find_all('li', class_='b_algo')[:max_results]:
                         try:
@@ -1855,7 +1873,8 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
                             full_text = title + ' ' + snippet
                             price = extract_price_from_text(full_text)
                             
-                            if price > 0:
+                            # Only accept prices within valid range (validated against estimates)
+                            if price > 0 and valid_price_min <= price <= valid_price_max:
                                 vendor = extract_vendor_from_url(link)
                                 products.append({
                                     'name': title[:100],
@@ -1870,11 +1889,6 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
                             continue
             except Exception as e:
                 logger.warning(f"Bing search failed: {e}")
-            
-            # Method 2: Generate estimated prices based on product type
-            if len(products) < 3:
-                estimated = generate_estimated_prices(query)
-                products.extend(estimated)
                     
     except Exception as e:
         logger.error(f"Free web search error: {e}")
