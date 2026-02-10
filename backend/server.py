@@ -1957,7 +1957,13 @@ def generate_estimated_prices(query: str) -> List[Dict]:
         
         # Audio
         'sony wh-1000xm5': (25000, 30000, 35000),
+        'sony wh 1000xm5': (25000, 30000, 35000),  # Without hyphen
+        'wh-1000xm5': (25000, 30000, 35000),
+        'wh 1000xm5': (25000, 30000, 35000),  # Without hyphen
         'sony wh-1000xm4': (20000, 25000, 30000),
+        'sony wh 1000xm4': (20000, 25000, 30000),  # Without hyphen
+        'wh-1000xm4': (20000, 25000, 30000),
+        'wh 1000xm4': (20000, 25000, 30000),  # Without hyphen
         'sony headphones': (15000, 25000, 35000),
         'airpods pro': (20000, 25000, 30000),
         'airpods': (12000, 18000, 25000),
