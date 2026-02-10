@@ -38,30 +38,24 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **Fully Dynamic Search**: Removed all predefined category mappings - searches ONLY by product/brand name in store names
 - ✅ **Comprehensive Testing**: 25+ backend tests created and all passed
 
-### Feb 10, 2026 - Bulk Excel Upload Feature with Min/Med/Max Rates & GST ✅ COMPLETE
+### Feb 10, 2026 - Bulk Excel Upload Feature with Full Diff Columns ✅ COMPLETE
 - ✅ **Upload Excel**: Users can upload Excel file with product names, rates, and quantities
-- ✅ **Automatic Processing**: Each product is searched (fallback: estimated prices when API exhausted)
-- ✅ **Output Excel Columns (15 total)**:
+- ✅ **Output Excel Columns (19 total)**:
   - Item Details: SL No, Item
   - Your Data: Your Rate, Qty, Your Amount
-  - Market MINIMUM: Min Rate, Min Amount (Rate × Qty)
-  - Market MEDIUM: Med Rate, Med Amount (Rate × Qty)
-  - Market MAXIMUM: Max Rate, Max Amount (Rate × Qty)
-  - Difference: Rate Diff (vs Min), Amount Diff (vs Min)
+  - Market MINIMUM: Min Rate, Min Amount, **Rate Diff (Min)**, **Amount Diff (Min)**
+  - Market MEDIUM: Med Rate, Med Amount, **Rate Diff (Med)**, **Amount Diff (Med)**
+  - Market MAXIMUM: Max Rate, Max Amount, **Rate Diff (Max)**, **Amount Diff (Max)**
   - Sources: Website Links, Vendor Details
-- ✅ **Consolidated GST Summary at Bottom** with FOUR sections:
-  - YOUR PRICING: Taxable Amount → CGST @9% → SGST @9% → Round Off → Grand Total
-  - MARKET MINIMUM: Same structure
-  - MARKET MEDIUM: Same structure
-  - MARKET MAXIMUM: Same structure
-  - COMPARISON: Shows difference between Your Grand Total vs Market Minimum
-- ✅ **Color Highlighting**: 
-  - Min columns: Light green
-  - Med columns: Light yellow
-  - Max columns: Light orange
-  - Diff columns: Green (good deal) / Red (overpaying)
-- ✅ **Improved Price Estimation**: 50+ product categories with realistic prices
-- ✅ **Testing**: 17 backend tests passed
+- ✅ **Diff Calculations for ALL Rate Types**:
+  - Rate Diff = Your Rate - Market Rate
+  - Amount Diff = Your Amount - Market Amount
+  - Applied for Min, Med, and Max (not just Min)
+- ✅ **Color Highlighting**:
+  - **Red** = Overpaying (positive diff: Your rate > Market rate)
+  - **Green** = Good Deal (negative diff: Your rate < Market rate)
+- ✅ **Consolidated GST Summary** with FOUR sections (Your, Min, Med, Max)
+- ✅ **Testing**: 15 backend tests passed
 
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
