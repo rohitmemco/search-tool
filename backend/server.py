@@ -3437,25 +3437,26 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
                 
-                # Number columns - right align
-                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
+                # Number columns - right align (all numeric columns: C-Q)
+                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 14:  # Website links - wrap text
+                elif col_idx == 18:  # Website links - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
                 
                 # Color-code market rate columns with light backgrounds
-                if col_idx in [6, 7]:  # Min columns
+                if col_idx in [6, 7]:  # Min Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = min_fill
-                elif col_idx in [8, 9]:  # Med columns
+                elif col_idx in [10, 11]:  # Med Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = med_fill
-                elif col_idx in [10, 11]:  # Max columns
+                elif col_idx in [14, 15]:  # Max Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = max_fill
                 
-                # Apply color highlighting for difference columns (L and M)
-                if col_idx in [12, 13]:
+                # Apply color highlighting for ALL difference columns
+                # Min Diff (H, I), Med Diff (L, M), Max Diff (P, Q)
+                if col_idx in [8, 9, 12, 13, 16, 17]:
                     if isinstance(value, (int, float)):
                         if value > 0:  # Positive = You're paying MORE than market (Overpaying)
                             cell.fill = red_fill
@@ -3464,13 +3465,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             cell.fill = green_fill
                             cell.font = green_font
         
-        # Adjust column widths (15 columns)
-        column_widths = [8, 35, 12, 6, 14, 12, 14, 12, 14, 12, 14, 12, 14, 45, 40]
+        # Adjust column widths (19 columns)
+        column_widths = [8, 32, 12, 6, 14, 12, 13, 12, 14, 12, 13, 12, 14, 12, 13, 12, 14, 40, 35]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
         # Set row heights
-        output_sheet.row_dimensions[1].height = 35  # Header row
+        output_sheet.row_dimensions[1].height = 40  # Header row (taller for wrapped text)
         for row_idx in range(2, len(results) + 2):
             output_sheet.row_dimensions[row_idx].height = 45
         
