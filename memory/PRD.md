@@ -38,15 +38,22 @@ Build a comprehensive web-based application that enables users to search for any
 - ✅ **Fully Dynamic Search**: Removed all predefined category mappings - searches ONLY by product/brand name in store names
 - ✅ **Comprehensive Testing**: 25+ backend tests created and all passed
 
-### Feb 10, 2026 - Bulk Excel Upload Feature ✅ NEW
-- ✅ **Upload Excel**: Users can upload Excel file with product names
-- ✅ **Automatic Processing**: Each product is searched via SerpAPI
+### Feb 10, 2026 - Bulk Excel Upload Feature with GST Calculations ✅ COMPLETE
+- ✅ **Upload Excel**: Users can upload Excel file with product names, rates, and quantities
+- ✅ **Automatic Processing**: Each product is searched via SerpAPI (fallback: estimated prices)
 - ✅ **Price Analysis**: Extracts min, median, and max prices for each product
-- ✅ **Vendor Detection**: Identifies cheapest vendor and all vendors with websites
+- ✅ **GST Calculations**: CGST @9% + SGST @9% = 18% total GST for both user and market rates
+- ✅ **Output Excel Columns (17 total)**:
+  - Item Details: SL No, Item
+  - Your Data: Rate, Qty, Amount, CGST @9%, SGST @9%, Grand Total
+  - Market Data: Rate, Amount, CGST @9%, SGST @9%, Grand Total
+  - Difference: Rate Diff, Grand Total Diff
+  - Sources: Website Links, Vendor Details
+- ✅ **Color Highlighting**: Green for good deals, Red for overpaying
+- ✅ **Legend Section**: Explains color coding and GST calculation methodology
 - ✅ **Results Download**: Auto-generates and downloads results Excel file
 - ✅ **Template Download**: Provides downloadable template Excel file
-- ✅ **UI Modal**: Clean drag-and-drop upload interface with progress indicator
-- ✅ **Testing**: 14 backend tests + frontend verification passed
+- ✅ **Testing**: 27 backend tests passed (13 GST tests + 14 bulk upload tests)
 
 ### Jan 26, 2026 - Vendor Contact Details Enhancement ✅ NEW
 - ✅ **Clear Online vs Local Distinction**: Vendors tab now shows "Online Sellers" with explanation that contact details aren't available for online marketplaces
