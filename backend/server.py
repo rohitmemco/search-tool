@@ -1878,49 +1878,86 @@ async def search_free_web(query: str, max_results: int = 20) -> List[Dict]:
             except Exception as e:
                 logger.warning(f"DuckDuckGo search failed: {e}")
             
-            # Also try Google search (may be rate limited)
+            # Try IndiaMart search for B2B prices
             if len(products) < 5:
-                google_url = f"https://www.google.com/search?q={encoded_query}&num=20"
                 try:
-                    response = await client.get(google_url, headers=headers)
+                    indiamart_url = f"https://dir.indiamart.com/search.mp?ss={encoded_query}"
+                    response = await client.get(indiamart_url, headers=headers)
                     if response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'lxml')
                         
-                        # Parse Google results
-                        for g in soup.find_all('div', class_='g')[:max_results]:
+                        # Find price elements in IndiaMart
+                        price_elements = soup.find_all(['span', 'div'], string=re.compile(r'₹|Rs\.?|INR'))
+                        for elem in price_elements[:10]:
                             try:
-                                title_elem = g.find('h3')
-                                link_elem = g.find('a')
-                                snippet_elem = g.find('div', class_='VwiC3b')
-                                
-                                if title_elem and link_elem:
-                                    title = title_elem.get_text(strip=True)
-                                    link = link_elem.get('href', '')
-                                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else ''
-                                    
-                                    price = extract_price_from_text(title + ' ' + snippet)
-                                    vendor = extract_vendor_from_url(link)
-                                    
-                                    if price and price > 0:
+                                text = elem.get_text()
+                                price = extract_price_from_text(text)
+                                if price > 0:
+                                    # Get parent element for context
+                                    parent = elem.find_parent(['div', 'li', 'article'])
+                                    if parent:
+                                        title = parent.get_text()[:100].strip()
+                                        link_elem = parent.find('a', href=True)
+                                        link = link_elem['href'] if link_elem else indiamart_url
+                                        
                                         products.append({
-                                            'name': title[:100],
+                                            'name': title,
                                             'price': price,
                                             'currency_symbol': '₹',
                                             'currency_code': 'INR',
-                                            'source': vendor,
+                                            'source': 'IndiaMart',
                                             'source_url': link,
-                                            'description': snippet[:200] if snippet else ''
+                                            'description': ''
                                         })
                             except:
                                 continue
                 except Exception as e:
-                    logger.warning(f"Google search failed: {e}")
+                    logger.warning(f"IndiaMart search failed: {e}")
+            
+            # Try JustDial for local prices
+            if len(products) < 5:
+                try:
+                    justdial_query = query.replace(' ', '-')
+                    justdial_url = f"https://www.justdial.com/Delhi/{quote_plus(justdial_query)}"
+                    response = await client.get(justdial_url, headers=headers)
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'lxml')
+                        
+                        # Find price text
+                        price_spans = soup.find_all(['span', 'div'], class_=re.compile(r'price|cost|rate', re.I))
+                        for span in price_spans[:10]:
+                            try:
+                                text = span.get_text()
+                                price = extract_price_from_text(text)
+                                if price > 0:
+                                    products.append({
+                                        'name': query,
+                                        'price': price,
+                                        'currency_symbol': '₹',
+                                        'currency_code': 'INR',
+                                        'source': 'JustDial',
+                                        'source_url': justdial_url,
+                                        'description': ''
+                                    })
+                            except:
+                                continue
+                except Exception as e:
+                    logger.warning(f"JustDial search failed: {e}")
                     
     except Exception as e:
         logger.error(f"Free web search error: {e}")
     
-    logger.info(f"Free web search returned {len(products)} products for: {query}")
-    return products
+    # Remove duplicates based on price and source
+    seen = set()
+    unique_products = []
+    for p in products:
+        key = (p['price'], p['source'])
+        if key not in seen:
+            seen.add(key)
+            unique_products.append(p)
+    
+    logger.info(f"Free web search returned {len(unique_products)} products for: {query}")
+    return unique_products
 
 def extract_price_from_text(text: str) -> float:
     """Extract price from text containing INR/Rs prices"""
