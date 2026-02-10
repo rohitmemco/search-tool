@@ -3596,49 +3596,6 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         legend_red.font = red_font
         
         output_sheet.cell(row=legend_row + 4, column=1, value="Note: Rate Diff and Amount Diff are calculated against Market MINIMUM rates.").font = Font(italic=True)
-            label_cell = output_sheet.cell(row=row, column=4, value=label)
-            value_cell = output_sheet.cell(row=row, column=5, value=value)
-            label_cell.border = thin_border
-            value_cell.border = thin_border
-            value_cell.alignment = Alignment(horizontal="right")
-            
-            if label == "Grand Total":
-                label_cell.font = Font(bold=True)
-                value_cell.font = Font(bold=True)
-                label_cell.fill = summary_fill
-                value_cell.fill = summary_fill
-        
-        # Comparison / Savings section
-        comparison_row = summary_row + 7
-        output_sheet.merge_cells(f'A{comparison_row}:E{comparison_row}')
-        if savings > 0:
-            comparison_text = f"DIFFERENCE: You are paying ₹{savings:,.2f} MORE than market minimum (OVERPAYING)"
-            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
-            comparison_cell.fill = red_fill
-            comparison_cell.font = Font(bold=True, color="9C0006")
-        elif savings < 0:
-            comparison_text = f"DIFFERENCE: You are paying ₹{abs(savings):,.2f} LESS than market minimum (GOOD DEAL)"
-            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
-            comparison_cell.fill = green_fill
-            comparison_cell.font = Font(bold=True, color="006100")
-        else:
-            comparison_text = "DIFFERENCE: Your pricing matches market minimum"
-            comparison_cell = output_sheet.cell(row=comparison_row, column=1, value=comparison_text)
-            comparison_cell.font = Font(bold=True)
-        comparison_cell.alignment = Alignment(horizontal="center")
-        comparison_cell.border = thick_border
-        
-        # Legend
-        legend_row = comparison_row + 3
-        output_sheet.cell(row=legend_row, column=1, value="Legend:").font = Font(bold=True)
-        
-        legend_green = output_sheet.cell(row=legend_row + 1, column=1, value="Green = Good Deal (Your rate is LOWER than market)")
-        legend_green.fill = green_fill
-        legend_green.font = green_font
-        
-        legend_red = output_sheet.cell(row=legend_row + 2, column=1, value="Red = Overpaying (Your rate is HIGHER than market)")
-        legend_red.fill = red_fill
-        legend_red.font = red_font
         
         # Save to BytesIO
         output_buffer = io.BytesIO()
