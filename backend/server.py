@@ -3368,14 +3368,13 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         med_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")  # Med section - light yellow
         max_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")  # Max section - light orange
         
-        # Headers with Min, Med, Max rate columns
+        # Headers with Min, Med, Max rate columns + Diff columns for each
         headers = [
             "SL No", "Item", 
             "Your Rate (₹)", "Qty", "Your Amount (₹)",
-            "Min Rate (₹)", "Min Amount (₹)",
-            "Med Rate (₹)", "Med Amount (₹)",
-            "Max Rate (₹)", "Max Amount (₹)",
-            "Rate Diff (₹)", "Amount Diff (₹)",
+            "Min Rate (₹)", "Min Amount (₹)", "Rate Diff (Min) (₹)", "Amount Diff (Min) (₹)",
+            "Med Rate (₹)", "Med Amount (₹)", "Rate Diff (Med) (₹)", "Amount Diff (Med) (₹)",
+            "Max Rate (₹)", "Max Amount (₹)", "Rate Diff (Max) (₹)", "Amount Diff (Max) (₹)",
             "Website Links", "Vendor Details"
         ]
         
@@ -3413,21 +3412,25 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 total_market_max_amount += result['market_max_total']
             
             data = [
-                result['sl_no'],                         # A - SL No
-                result['item'],                          # B - Item
-                result['user_rate'],                     # C - Your Rate
-                result['quantity'],                      # D - Qty
-                result['user_amount'],                   # E - Your Amount
-                result.get('market_min_rate', 'N/A'),    # F - Min Rate
-                result.get('market_min_total', 'N/A'),   # G - Min Amount
-                result.get('market_med_rate', 'N/A'),    # H - Med Rate
-                result.get('market_med_total', 'N/A'),   # I - Med Amount
-                result.get('market_max_rate', 'N/A'),    # J - Max Rate
-                result.get('market_max_total', 'N/A'),   # K - Max Amount
-                result['rate_diff'],                     # L - Rate Diff (vs Min)
-                result['amount_diff'],                   # M - Amount Diff (vs Min)
-                result['website_links'],                 # N - Website Links
-                result['vendor_details']                 # O - Vendor Details
+                result['sl_no'],                              # A - SL No
+                result['item'],                               # B - Item
+                result['user_rate'],                          # C - Your Rate
+                result['quantity'],                           # D - Qty
+                result['user_amount'],                        # E - Your Amount
+                result.get('market_min_rate', 'N/A'),         # F - Min Rate
+                result.get('market_min_total', 'N/A'),        # G - Min Amount
+                result.get('rate_diff_min', 'N/A'),           # H - Rate Diff (Min)
+                result.get('amount_diff_min', 'N/A'),         # I - Amount Diff (Min)
+                result.get('market_med_rate', 'N/A'),         # J - Med Rate
+                result.get('market_med_total', 'N/A'),        # K - Med Amount
+                result.get('rate_diff_med', 'N/A'),           # L - Rate Diff (Med)
+                result.get('amount_diff_med', 'N/A'),         # M - Amount Diff (Med)
+                result.get('market_max_rate', 'N/A'),         # N - Max Rate
+                result.get('market_max_total', 'N/A'),        # O - Max Amount
+                result.get('rate_diff_max', 'N/A'),           # P - Rate Diff (Max)
+                result.get('amount_diff_max', 'N/A'),         # Q - Amount Diff (Max)
+                result['website_links'],                      # R - Website Links
+                result['vendor_details']                      # S - Vendor Details
             ]
             
             for col_idx, value in enumerate(data, start=1):
