@@ -3415,6 +3415,12 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         legend_red.fill = red_fill
         legend_red.font = red_font
         
+        # GST explanation
+        output_sheet.cell(row=legend_row + 4, column=1, value="GST Calculations:").font = Font(bold=True)
+        output_sheet.cell(row=legend_row + 5, column=1, value="• CGST (Central GST) @ 9%")
+        output_sheet.cell(row=legend_row + 6, column=1, value="• SGST (State GST) @ 9%")
+        output_sheet.cell(row=legend_row + 7, column=1, value="• Grand Total = Amount + CGST + SGST (Total 18% GST)")
+        
         # Save to BytesIO
         output_buffer = io.BytesIO()
         output_workbook.save(output_buffer)
