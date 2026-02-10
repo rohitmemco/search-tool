@@ -2465,6 +2465,53 @@ Provide 3-5 recommendations based on their interests."""
         return {"recommendations": [], "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones"]}
 
 # ================== EXCEL BULK PROCESSING ==================
+
+def validate_and_filter_prices(prices_with_sources: list) -> list:
+    """
+    Filter out unreliable/unrealistic prices using statistical methods.
+    Removes outliers that are too low (likely errors, used items, or scams).
+    """
+    if not prices_with_sources or len(prices_with_sources) < 3:
+        return prices_with_sources
+    
+    prices = [p['price'] for p in prices_with_sources]
+    
+    # Calculate IQR (Interquartile Range) for outlier detection
+    sorted_prices = sorted(prices)
+    n = len(sorted_prices)
+    q1_idx = n // 4
+    q3_idx = (3 * n) // 4
+    q1 = sorted_prices[q1_idx]
+    q3 = sorted_prices[q3_idx]
+    iqr = q3 - q1
+    
+    # Define bounds - prices below lower bound are likely errors/scams
+    # Using 1.5 * IQR below Q1 as lower bound
+    lower_bound = max(q1 - 1.5 * iqr, sorted_prices[0] * 0.3)  # At least 30% of min price
+    upper_bound = q3 + 1.5 * iqr
+    
+    # Also filter out prices that are suspiciously low (less than 10% of median)
+    median_price = sorted_prices[n // 2]
+    min_acceptable = median_price * 0.1  # At least 10% of median
+    
+    # Filter prices
+    filtered = []
+    for item in prices_with_sources:
+        price = item['price']
+        # Keep prices within acceptable range
+        if price >= max(lower_bound, min_acceptable) and price <= upper_bound:
+            filtered.append(item)
+    
+    # If filtering removed too many, keep at least the middle 50%
+    if len(filtered) < len(prices_with_sources) * 0.3:
+        # Fall back to middle 50% of prices
+        start_idx = n // 4
+        end_idx = (3 * n) // 4
+        filtered = [prices_with_sources[i] for i in range(len(prices_with_sources)) 
+                   if sorted_prices[start_idx] <= prices_with_sources[i]['price'] <= sorted_prices[end_idx]]
+    
+    return filtered if filtered else prices_with_sources
+
 @api_router.post("/bulk-search/upload")
 async def bulk_search_upload(file: UploadFile = File(...)):
     """
@@ -2474,9 +2521,12 @@ async def bulk_search_upload(file: UploadFile = File(...)):
     Expected Excel format:
     - Column A: SL No (Serial Number)
     - Column B: Item (Product Name)
+    - Column C: Quantity (optional, defaults to 1)
     
-    Output Excel contains ONLY:
-    - SL No, Item, Min Rate, Medium Rate, Max Rate, Website Links, Vendor Details
+    Output Excel contains:
+    - SL No, Item, Quantity, Min Rate, Medium Rate, Max Rate
+    - Min Total, Medium Total, Max Total (Rate × Quantity)
+    - Website Links, Vendor Details
     """
     try:
         # Validate file type
@@ -2493,17 +2543,28 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
         
-        # Extract product entries from Excel (Column A: SL No, Column B: Item)
+        # Extract product entries from Excel (Column A: SL No, Column B: Item, Column C: Quantity)
         products = []
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):  # Skip header
             if row and len(row) >= 2 and row[1]:  # Check if Item name exists in Column B
                 sl_no = str(row[0]).strip() if row[0] else str(row_idx - 1)
                 item_name = str(row[1]).strip()
+                # Get quantity from Column C, default to 1 if not provided
+                quantity = 1
+                if len(row) >= 3 and row[2]:
+                    try:
+                        quantity = int(float(str(row[2]).strip()))
+                        if quantity < 1:
+                            quantity = 1
+                    except (ValueError, TypeError):
+                        quantity = 1
+                
                 if item_name:
                     products.append({
                         "row": row_idx,
                         "sl_no": sl_no,
                         "item": item_name,
+                        "quantity": quantity,
                         "query": item_name
                     })
         
@@ -2516,38 +2577,56 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         results = []
         for idx, product_info in enumerate(products):
             try:
-                logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']}")
+                logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']} (Qty: {product_info['quantity']})")
                 
                 # Search using SerpAPI
                 search_results = await search_with_serpapi(
                     query=product_info['query'],
                     country="india",
-                    max_results=20
+                    max_results=30  # Get more results for better price validation
                 )
                 
                 if search_results:
-                    # Extract prices
-                    prices = [r.get('price', 0) for r in search_results if r.get('price', 0) > 0]
+                    # Collect prices with their sources for validation
+                    prices_with_sources = []
+                    for r in search_results:
+                        price = r.get('price', 0)
+                        if price > 0:
+                            prices_with_sources.append({
+                                'price': price,
+                                'vendor': r.get('source', ''),
+                                'website': r.get('source_url', ''),
+                                'name': r.get('name', '')
+                            })
                     
-                    # Calculate min, median, max
-                    if prices:
+                    # Validate and filter prices to remove outliers/errors
+                    validated_prices = validate_and_filter_prices(prices_with_sources)
+                    
+                    if validated_prices:
+                        prices = [p['price'] for p in validated_prices]
                         min_price = min(prices)
                         max_price = max(prices)
                         sorted_prices = sorted(prices)
                         mid_idx = len(sorted_prices) // 2
                         med_price = sorted_prices[mid_idx] if len(sorted_prices) % 2 == 1 else (sorted_prices[mid_idx - 1] + sorted_prices[mid_idx]) / 2
-                    else:
-                        min_price = med_price = max_price = 0
-                    
-                    # Get vendor/website info
-                    vendors = []
-                    websites = []
-                    
-                    for r in search_results:
-                        vendor = r.get('source', '')
-                        website = r.get('source_url', '')
-                        if vendor and vendor not in vendors:
-                            vendors.append(vendor)
+                        
+                        # Calculate quantity-wise totals
+                        quantity = product_info['quantity']
+                        min_total = min_price * quantity
+                        med_total = med_price * quantity
+                        max_total = max_price * quantity
+                        
+                        # Get vendor/website info from validated results only
+                        vendors = []
+                        websites = []
+                        
+                        for item in validated_prices:
+                            vendor = item.get('vendor', '')
+                            website = item.get('website', '')
+                            if vendor and vendor not in vendors:
+                                vendors.append(vendor)
+                            if website and website not in websites:
+                                websites.append(website)
                         if website:
                             # Keep full URL for website links
                             if website not in websites:
