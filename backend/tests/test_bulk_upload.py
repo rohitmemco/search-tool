@@ -142,7 +142,7 @@ class TestBulkSearchUpload:
             pytest.fail(f"Response is not a valid Excel file: {e}")
     
     def test_upload_result_has_correct_columns(self, create_test_excel):
-        """Result Excel should have all required columns"""
+        """Result Excel should have all required columns including GST columns"""
         excel_file = create_test_excel([
             {"name": "Sony Headphones", "location": "Delhi"}
         ])
@@ -158,13 +158,13 @@ class TestBulkSearchUpload:
         wb = openpyxl.load_workbook(io.BytesIO(response.content))
         ws = wb.active
         
-        # Get headers
-        headers = [ws.cell(row=1, column=col).value for col in range(1, ws.max_column + 1)]
+        # Get headers from row 2 (row 1 has category headers)
+        headers = [ws.cell(row=2, column=col).value for col in range(1, ws.max_column + 1)]
         
-        # Required columns
+        # Required columns for GST format
         required_columns = [
-            "Product Name", "Location", "Min Price", "Median Price", "Max Price",
-            "Cheapest Vendor", "Cheapest Website", "All Vendors", "All Websites", "Status"
+            "SL No", "Item", "Your Rate", "Qty", "Your Amount", "CGST", "SGST", "Grand Total",
+            "Market Rate", "Market Amount", "Rate Diff", "Grand Total Diff"
         ]
         
         for req_col in required_columns:
