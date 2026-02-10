@@ -3270,12 +3270,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "user_amount": round(user_amount, 2),
                             "market_min_rate": "N/A",
                             "market_min_total": "N/A",
+                            "rate_diff_min": "N/A",
+                            "amount_diff_min": "N/A",
                             "market_med_rate": "N/A",
                             "market_med_total": "N/A",
+                            "rate_diff_med": "N/A",
+                            "amount_diff_med": "N/A",
                             "market_max_rate": "N/A",
                             "market_max_total": "N/A",
-                            "rate_diff": "N/A",
-                            "amount_diff": "N/A",
+                            "rate_diff_max": "N/A",
+                            "amount_diff_max": "N/A",
                             "website_links": "No valid prices found",
                             "vendor_details": "No valid prices found"
                         })
