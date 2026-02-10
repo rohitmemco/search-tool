@@ -3250,31 +3250,65 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")    # Overpaying
         green_font = Font(color="006100")
         red_font = Font(color="9C0006")
-            "SL No", "Item", "Quantity", 
-            "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)", 
-            "Min Total (₹)", "Medium Total (₹)", "Max Total (₹)",
+        
+        # Write headers - Your Data | Market Rates | Comparison
+        headers = [
+            "SL No", "Item", 
+            "Your Rate (₹)", "Qty", "Your Amount (₹)",  # User's data
+            "Min Rate (₹)", "Medium Rate (₹)", "Max Rate (₹)",  # Market rates
+            "Min Total (₹)", "Med Total (₹)", "Max Total (₹)",  # Market totals
+            "Rate Diff (₹)", "Amount Diff (₹)",  # Comparison
             "Website Links", "Vendor Details"
         ]
         
+        # Category headers (merge cells for better organization)
+        output_sheet.merge_cells('A1:B1')
+        output_sheet.merge_cells('C1:E1')
+        output_sheet.merge_cells('F1:H1')
+        output_sheet.merge_cells('I1:K1')
+        output_sheet.merge_cells('L1:M1')
+        output_sheet.merge_cells('N1:O1')
+        
+        # Write category headers (row 1)
+        category_headers = [
+            ("A1", "Item Details"),
+            ("C1", "Your Data"),
+            ("F1", "Market Rates (Per Unit)"),
+            ("I1", "Market Totals (Rate × Qty)"),
+            ("L1", "Difference"),
+            ("N1", "Sources")
+        ]
+        for cell_ref, text in category_headers:
+            cell = output_sheet[cell_ref]
+            cell.value = text
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Write column headers (row 2)
         for col_idx, header in enumerate(headers, start=1):
-            cell = output_sheet.cell(row=1, column=col_idx, value=header)
+            cell = output_sheet.cell(row=2, column=col_idx, value=header)
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
             cell.border = thin_border
         
-        # Write data
-        for row_idx, result in enumerate(results, start=2):
+        # Write data (starting row 3)
+        for row_idx, result in enumerate(results, start=3):
             data = [
                 result['sl_no'],
                 result['item'],
+                result['user_rate'],
                 result['quantity'],
+                result['user_amount'],
                 result['min_rate'],
                 result['med_rate'],
                 result['max_rate'],
                 result['min_total'],
                 result['med_total'],
                 result['max_total'],
+                result['rate_diff'],
+                result['amount_diff'],
                 result['website_links'],
                 result['vendor_details']
             ]
@@ -3282,19 +3316,45 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
-                if col_idx in [3, 4, 5, 6, 7, 8, 9]:  # Quantity and Price columns
+                
+                # Number columns - right align
+                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 10:  # Website links - wrap text
+                elif col_idx == 14:  # Website links - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
+                
+                # Apply color highlighting for difference columns
+                if col_idx in [12, 13]:  # Rate Diff and Amount Diff
+                    if isinstance(value, (int, float)):
+                        if value > 0:  # Positive = You're paying MORE than market (Overpaying)
+                            cell.fill = red_fill
+                            cell.font = red_font
+                        elif value < 0:  # Negative = You're paying LESS than market (Good deal)
+                            cell.fill = green_fill
+                            cell.font = green_font
         
-        # Adjust column widths for new layout
-        column_widths = [10, 35, 10, 15, 15, 15, 15, 15, 15, 55, 45]
+        # Adjust column widths
+        column_widths = [8, 35, 12, 8, 14, 12, 12, 12, 12, 12, 12, 12, 14, 45, 40]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
-        # Set row heights for website links (allow for multiple lines)
-        for row_idx in range(2, len(results) + 2):
-            output_sheet.row_dimensions[row_idx].height = 60
+        # Set row heights
+        output_sheet.row_dimensions[1].height = 25  # Category header row
+        output_sheet.row_dimensions[2].height = 35  # Column header row
+        for row_idx in range(3, len(results) + 3):
+            output_sheet.row_dimensions[row_idx].height = 50
+        
+        # Add legend at the bottom
+        legend_row = len(results) + 5
+        output_sheet.cell(row=legend_row, column=1, value="Legend:").font = Font(bold=True)
+        
+        legend_green = output_sheet.cell(row=legend_row + 1, column=1, value="Green = Good Deal (Your rate is LOWER than market)")
+        legend_green.fill = green_fill
+        legend_green.font = green_font
+        
+        legend_red = output_sheet.cell(row=legend_row + 2, column=1, value="Red = Overpaying (Your rate is HIGHER than market)")
+        legend_red.fill = red_fill
+        legend_red.font = red_font
         
         # Save to BytesIO
         output_buffer = io.BytesIO()
@@ -3303,7 +3363,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"PriceSearch_Results_{timestamp}.xlsx"
+        output_filename = f"PriceComparison_Results_{timestamp}.xlsx"
         
         logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results.")
         
