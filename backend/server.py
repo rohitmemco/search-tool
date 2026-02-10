@@ -2627,27 +2627,49 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                                 vendors.append(vendor)
                             if website and website not in websites:
                                 websites.append(website)
-                        if website:
-                            # Keep full URL for website links
-                            if website not in websites:
-                                websites.append(website)
-                    
-                    results.append({
-                        "sl_no": product_info['sl_no'],
-                        "item": product_info['item'],
-                        "min_rate": min_price,
-                        "med_rate": round(med_price, 2),
-                        "max_rate": max_price,
-                        "website_links": "\n".join(websites[:5]),  # Top 5 website links
-                        "vendor_details": ", ".join(vendors[:10])  # Top 10 vendors
-                    })
+                        
+                        results.append({
+                            "sl_no": product_info['sl_no'],
+                            "item": product_info['item'],
+                            "quantity": quantity,
+                            "min_rate": round(min_price, 2),
+                            "med_rate": round(med_price, 2),
+                            "max_rate": round(max_price, 2),
+                            "min_total": round(min_total, 2),
+                            "med_total": round(med_total, 2),
+                            "max_total": round(max_total, 2),
+                            "website_links": "\n".join(websites[:5]),  # Top 5 website links
+                            "vendor_details": ", ".join(vendors[:10])  # Top 10 vendors
+                        })
+                    else:
+                        # No validated prices
+                        results.append({
+                            "sl_no": product_info['sl_no'],
+                            "item": product_info['item'],
+                            "quantity": product_info['quantity'],
+                            "min_rate": "N/A",
+                            "med_rate": "N/A",
+                            "max_rate": "N/A",
+                            "min_total": "N/A",
+                            "med_total": "N/A",
+                            "max_total": "N/A",
+                            "website_links": "No valid prices found",
+                            "vendor_details": "No valid prices found"
+                        })
                 else:
                     results.append({
                         "sl_no": product_info['sl_no'],
                         "item": product_info['item'],
+                        "quantity": product_info['quantity'],
                         "min_rate": "N/A",
                         "med_rate": "N/A",
                         "max_rate": "N/A",
+                        "min_total": "N/A",
+                        "med_total": "N/A",
+                        "max_total": "N/A",
+                        "website_links": "No results found",
+                        "vendor_details": "No results found"
+                    })
                         "website_links": "No results found",
                         "vendor_details": "No results found"
                     })
