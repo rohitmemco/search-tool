@@ -1,0 +1,111 @@
+{
+  "summary": "Bulk Excel Upload feature testing completed - All 18 tests passed. Verified new format: NO per-item GST columns (11 columns), Market MINIMUM rate used, consolidated GST summary at bottom with YOUR PRICING vs MARKET MINIMUM PRICING, CGST/SGST @9% on totals only, DIFFERENCE comparison line.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "POST /api/bulk-search/upload returns 200 with valid Excel",
+    "NO per-item GST columns in output (verified: 'Your CGST', 'Your SGST', 'Market CGST', 'Market SGST' NOT present)",
+    "Output has correct 11 columns: SL No, Item, Your Rate, Qty, Your Amount, Market Min Rate, Market Min Amount, Rate Diff, Amount Diff, Website Links, Vendor Details",
+    "Market MINIMUM rate used (column header 'Market Min Rate', not 'Market Median Rate')",
+    "Consolidated GST summary section exists at bottom",
+    "YOUR PRICING section exists in summary",
+    "MARKET MINIMUM PRICING section exists in summary",
+    "Taxable Amount line exists in summary",
+    "CGST @ 9% line exists in summary",
+    "SGST @ 9% line exists in summary",
+    "Grand Total line exists in summary",
+    "DIFFERENCE line shows savings/overpaying comparison",
+    "GST calculated on TOTAL amounts only (verified math: Amount × 0.09 = CGST/SGST)",
+    "Samsung Galaxy S24 price realistic (₹65,000 - within ₹65K-90K range)",
+    "MacBook Air M3 price realistic (₹100,000 - within ₹100K-140K range)",
+    "Sony WH-1000XM5 price realistic (₹25,000 - within ₹25K-35K range)",
+    "GET /api/bulk-search/template returns 200",
+    "Template is valid Excel file"
+  ],
+
+  "verified_calculations": {
+    "example_input": {
+      "Samsung Galaxy S24": { "rate": 85000, "qty": 1, "amount": 85000 },
+      "MacBook Air M3": { "rate": 120000, "qty": 2, "amount": 240000 },
+      "Sony WH-1000XM5": { "rate": 32000, "qty": 1, "amount": 32000 }
+    },
+    "total_your_amount": "₹357,000 (85,000 + 240,000 + 32,000)",
+    "your_cgst_9_percent": "₹32,130 (357,000 × 0.09) ✅",
+    "your_sgst_9_percent": "₹32,130 (357,000 × 0.09) ✅",
+    "your_grand_total": "₹421,260 (357,000 + 32,130 + 32,130) ✅",
+    "market_min_total": "₹290,000 (65,000 + 200,000 + 25,000)",
+    "market_cgst": "₹26,100 (290,000 × 0.09) ✅",
+    "market_sgst": "₹26,100 (290,000 × 0.09) ✅",
+    "market_grand_total": "₹342,200 ✅",
+    "difference": "₹79,060 (OVERPAYING) ✅"
+  },
+
+  "output_excel_columns": [
+    "SL No",
+    "Item",
+    "Your Rate (₹)",
+    "Qty",
+    "Your Amount (₹)",
+    "Market Min Rate (₹)",
+    "Market Min Amount (₹)",
+    "Rate Diff (₹)",
+    "Amount Diff (₹)",
+    "Website Links",
+    "Vendor Details"
+  ],
+
+  "consolidated_summary_structure": {
+    "header": "CONSOLIDATED SUMMARY (GST Calculation)",
+    "your_pricing_section": ["Taxable Amount", "CGST @ 9.0%", "SGST @ 9.0%", "Round Off", "Grand Total"],
+    "market_pricing_section": ["Taxable Amount", "CGST @ 9.0%", "SGST @ 9.0%", "Round Off", "Grand Total"],
+    "difference_line": "Shows 'MORE than market minimum (OVERPAYING)' or 'LESS than market minimum (GOOD DEAL)'",
+    "legend": ["Green = Good Deal", "Red = Overpaying"]
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_bulk_upload_v2.py",
+    "/app/test_reports/pytest/pytest_bulk_upload_v2.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "New format correctly implemented - NO per-item GST columns",
+    "Market MINIMUM rate used correctly (not median)",
+    "Consolidated GST summary at bottom with proper structure",
+    "GST calculations correct: CGST @9% + SGST @9% = 18% total on TOTALS only",
+    "DIFFERENCE line properly shows overpaying/good deal status",
+    "Estimated prices for popular products (Samsung Galaxy, MacBook Air, Sony headphones) are realistic",
+    "Round Off calculation implemented in summary"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_bulk_upload_v2.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (18/18 tests passed)"
+  },
+
+  "seed_data_creation": "Test Excel files created dynamically during tests with Samsung Galaxy S24, MacBook Air M3, Sony WH-1000XM5",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Bulk Excel Upload feature completely refactored and tested. New format has 11 columns (NO per-item GST), uses Market MINIMUM rate, and has consolidated GST summary at bottom with YOUR PRICING vs MARKET MINIMUM PRICING sections. All GST calculations (CGST @9%, SGST @9%, Grand Total) are done on TOTAL amounts only, not per-item. SerpAPI is MOCKED/exhausted - using estimated market prices which are realistic for popular products.",
+
+  "mocked_apis": {
+    "SerpAPI": "Using estimated market prices as fallback due to API exhaustion - prices are realistic (Samsung Galaxy S24: ₹65K, MacBook Air M3: ₹100K, Sony WH-1000XM5: ₹25K)"
+  }
+}
