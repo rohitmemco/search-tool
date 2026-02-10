@@ -2712,8 +2712,6 @@ async def download_template():
     sheet.cell(row=10, column=1, value="1. Add serial numbers in Column A (SL No)")
     sheet.cell(row=11, column=1, value="2. Add item/product names in Column B (Item)")
     sheet.cell(row=12, column=1, value="3. Save and upload this file to get price results")
-    sheet.cell(row=11, column=1, value="2. Optionally add location in Column B for location-specific search")
-    sheet.cell(row=12, column=1, value="3. Save and upload this file to get price comparison results")
     
     # Save to BytesIO
     output_buffer = io.BytesIO()
@@ -2724,7 +2722,7 @@ async def download_template():
         output_buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": "attachment; filename=PriceNexus_BulkSearch_Template.xlsx",
+            "Content-Disposition": "attachment; filename=PriceSearch_Template.xlsx",
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
     )
