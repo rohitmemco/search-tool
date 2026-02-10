@@ -35,7 +35,7 @@ class TestBulkSearchTemplate:
             pytest.fail(f"Template is not a valid Excel file: {e}")
     
     def test_template_has_correct_headers(self):
-        """Template should have Product Name and Location headers"""
+        """Template should have SL No, Item, Quantity headers"""
         response = requests.get(f"{BASE_URL}/api/bulk-search/template")
         assert response.status_code == 200
         
@@ -44,10 +44,12 @@ class TestBulkSearchTemplate:
         
         header_a = ws['A1'].value
         header_b = ws['B1'].value
+        header_c = ws['C1'].value
         
-        assert header_a == "Product Name", f"Expected 'Product Name', got '{header_a}'"
-        assert "Location" in str(header_b), f"Expected 'Location' in header B, got '{header_b}'"
-        print(f"✓ Template has correct headers: '{header_a}', '{header_b}'")
+        assert header_a == "SL No", f"Expected 'SL No', got '{header_a}'"
+        assert header_b == "Item", f"Expected 'Item' in header B, got '{header_b}'"
+        assert header_c == "Quantity", f"Expected 'Quantity' in header C, got '{header_c}'"
+        print(f"✓ Template has correct headers: '{header_a}', '{header_b}', '{header_c}'")
     
     def test_template_has_sample_data(self):
         """Template should have sample data rows"""
