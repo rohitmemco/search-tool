@@ -3301,6 +3301,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")  # GST columns
         
         # Write headers with GST columns
+        # Columns: A-B (Item Details), C-H (Your Data with GST), I-M (Market Data with GST), N-O (Difference), P-Q (Sources)
         headers = [
             "SL No", "Item", 
             "Your Rate (₹)", "Qty", "Your Amount (₹)", "Your CGST @9%", "Your SGST @9%", "Your Grand Total (₹)",
@@ -3310,21 +3311,20 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         ]
         
         # Category headers (merge cells for better organization)
+        # A-B: Item Details, C-H: Your Data (6 cols), I-M: Market Data (5 cols), N-O: Difference (2 cols), P-Q: Sources (2 cols)
         output_sheet.merge_cells('A1:B1')
-        output_sheet.merge_cells('C1:E1')
-        output_sheet.merge_cells('F1:H1')
-        output_sheet.merge_cells('I1:K1')
-        output_sheet.merge_cells('L1:M1')
+        output_sheet.merge_cells('C1:H1')
+        output_sheet.merge_cells('I1:M1')
         output_sheet.merge_cells('N1:O1')
+        output_sheet.merge_cells('P1:Q1')
         
         # Write category headers (row 1)
         category_headers = [
             ("A1", "Item Details"),
-            ("C1", "Your Data"),
-            ("F1", "Market Rates (Per Unit)"),
-            ("I1", "Market Totals (Rate × Qty)"),
-            ("L1", "Difference"),
-            ("N1", "Sources")
+            ("C1", "Your Data (with GST)"),
+            ("I1", "Market Data (with GST)"),
+            ("N1", "Difference"),
+            ("P1", "Sources")
         ]
         for cell_ref, text in category_headers:
             cell = output_sheet[cell_ref]
@@ -3340,39 +3340,50 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             cell.fill = header_fill
             cell.alignment = header_alignment
             cell.border = thin_border
+            # Highlight GST columns with yellow
+            if 'CGST' in header or 'SGST' in header:
+                cell.fill = yellow_fill
+                cell.font = Font(bold=True)
         
         # Write data (starting row 3)
         for row_idx, result in enumerate(results, start=3):
             data = [
-                result['sl_no'],
-                result['item'],
-                result['user_rate'],
-                result['quantity'],
-                result['user_amount'],
-                result['min_rate'],
-                result['med_rate'],
-                result['max_rate'],
-                result['min_total'],
-                result['med_total'],
-                result['max_total'],
-                result['rate_diff'],
-                result['amount_diff'],
-                result['website_links'],
-                result['vendor_details']
+                result['sl_no'],                    # A - SL No
+                result['item'],                     # B - Item
+                result['user_rate'],                # C - Your Rate
+                result['quantity'],                 # D - Qty
+                result['user_amount'],              # E - Your Amount
+                result['user_cgst'],                # F - Your CGST @9%
+                result['user_sgst'],                # G - Your SGST @9%
+                result['user_grand_total'],         # H - Your Grand Total
+                result['med_rate'],                 # I - Market Rate (using median)
+                result['med_total'],                # J - Market Amount
+                result['market_cgst'],              # K - Market CGST @9%
+                result['market_sgst'],              # L - Market SGST @9%
+                result['market_grand_total'],       # M - Market Grand Total
+                result['rate_diff'],                # N - Rate Diff
+                result['grand_total_diff'],         # O - Grand Total Diff
+                result['website_links'],            # P - Website Links
+                result['vendor_details']            # Q - Vendor Details
             ]
             
             for col_idx, value in enumerate(data, start=1):
                 cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
                 cell.border = thin_border
                 
-                # Number columns - right align
-                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]:
+                # Number columns - right align (columns C through O are numeric)
+                if col_idx in [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx == 14:  # Website links - wrap text
+                elif col_idx == 16:  # Website links - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
                 
-                # Apply color highlighting for difference columns
-                if col_idx in [12, 13]:  # Rate Diff and Amount Diff
+                # Highlight GST columns with light yellow background
+                if col_idx in [6, 7, 11, 12]:  # CGST/SGST columns
+                    if isinstance(value, (int, float)):
+                        cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+                
+                # Apply color highlighting for difference columns (N and O - Rate Diff and Grand Total Diff)
+                if col_idx in [14, 15]:
                     if isinstance(value, (int, float)):
                         if value > 0:  # Positive = You're paying MORE than market (Overpaying)
                             cell.fill = red_fill
@@ -3381,8 +3392,8 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             cell.fill = green_fill
                             cell.font = green_font
         
-        # Adjust column widths
-        column_widths = [8, 35, 12, 8, 14, 12, 12, 12, 12, 12, 12, 12, 14, 45, 40]
+        # Adjust column widths (17 columns now)
+        column_widths = [8, 35, 12, 6, 14, 14, 14, 16, 14, 14, 14, 14, 16, 12, 16, 45, 40]
         for col_idx, width in enumerate(column_widths, start=1):
             output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
         
