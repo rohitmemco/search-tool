@@ -2464,6 +2464,313 @@ Provide 3-5 recommendations based on their interests."""
         logger.error(f"Recommendations error: {e}")
         return {"recommendations": [], "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones"]}
 
+# ================== EXCEL BULK PROCESSING ==================
+@api_router.post("/bulk-search/upload")
+async def bulk_search_upload(file: UploadFile = File(...)):
+    """
+    Upload an Excel file with product entries.
+    Process each product, search for prices, and return results as downloadable Excel.
+    
+    Expected Excel format:
+    - Column A: Product Name (required)
+    - Column B: Location/City (optional)
+    
+    Output Excel contains:
+    - Product Name, Location, Min Price, Med Price, Max Price, 
+    - Cheapest Vendor, Cheapest Website, All Vendors, All Websites
+    """
+    try:
+        # Validate file type
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Please upload an Excel file (.xlsx or .xls)")
+        
+        # Read the uploaded file
+        contents = await file.read()
+        
+        # Parse Excel file
+        try:
+            workbook = openpyxl.load_workbook(io.BytesIO(contents))
+            sheet = workbook.active
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
+        
+        # Extract product entries from Excel
+        products = []
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):  # Skip header
+            if row and row[0]:  # Check if product name exists
+                product_name = str(row[0]).strip()
+                location = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                if product_name:
+                    products.append({
+                        "row": row_idx,
+                        "product": product_name,
+                        "location": location,
+                        "query": f"{product_name} {location}".strip() if location else product_name
+                    })
+        
+        if not products:
+            raise HTTPException(status_code=400, detail="No products found in Excel file. Please add products in Column A starting from row 2.")
+        
+        logger.info(f"Processing {len(products)} products from Excel upload")
+        
+        # Process each product
+        results = []
+        for idx, product_info in enumerate(products):
+            try:
+                logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['query']}")
+                
+                # Search using SerpAPI
+                search_results = await search_with_serpapi(
+                    query=product_info['query'],
+                    country="india",
+                    max_results=20
+                )
+                
+                if search_results:
+                    # Extract prices
+                    prices = [r.get('price', 0) for r in search_results if r.get('price', 0) > 0]
+                    
+                    # Calculate min, median, max
+                    if prices:
+                        min_price = min(prices)
+                        max_price = max(prices)
+                        sorted_prices = sorted(prices)
+                        mid_idx = len(sorted_prices) // 2
+                        med_price = sorted_prices[mid_idx] if len(sorted_prices) % 2 == 1 else (sorted_prices[mid_idx - 1] + sorted_prices[mid_idx]) / 2
+                    else:
+                        min_price = med_price = max_price = 0
+                    
+                    # Get vendor/website info
+                    vendors = []
+                    websites = []
+                    cheapest_vendor = ""
+                    cheapest_website = ""
+                    
+                    for r in search_results:
+                        vendor = r.get('source', '')
+                        website = r.get('source_url', '')
+                        if vendor and vendor not in vendors:
+                            vendors.append(vendor)
+                        if website:
+                            # Extract domain from URL
+                            try:
+                                from urllib.parse import urlparse
+                                domain = urlparse(website).netloc
+                                if domain and domain not in websites:
+                                    websites.append(domain)
+                            except:
+                                pass
+                        
+                        # Track cheapest
+                        if r.get('price', 0) == min_price and min_price > 0:
+                            if not cheapest_vendor:
+                                cheapest_vendor = vendor
+                                cheapest_website = website
+                    
+                    results.append({
+                        "row": product_info['row'],
+                        "product": product_info['product'],
+                        "location": product_info['location'],
+                        "min_price": min_price,
+                        "med_price": round(med_price, 2),
+                        "max_price": max_price,
+                        "cheapest_vendor": cheapest_vendor,
+                        "cheapest_website": cheapest_website,
+                        "all_vendors": ", ".join(vendors[:10]),  # Limit to 10
+                        "all_websites": ", ".join(websites[:10]),
+                        "results_count": len(search_results),
+                        "status": "Success"
+                    })
+                else:
+                    results.append({
+                        "row": product_info['row'],
+                        "product": product_info['product'],
+                        "location": product_info['location'],
+                        "min_price": 0,
+                        "med_price": 0,
+                        "max_price": 0,
+                        "cheapest_vendor": "",
+                        "cheapest_website": "",
+                        "all_vendors": "",
+                        "all_websites": "",
+                        "results_count": 0,
+                        "status": "No results found"
+                    })
+                
+                # Small delay to avoid rate limiting
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.error(f"Error processing product {product_info['product']}: {str(e)}")
+                results.append({
+                    "row": product_info['row'],
+                    "product": product_info['product'],
+                    "location": product_info['location'],
+                    "min_price": 0,
+                    "med_price": 0,
+                    "max_price": 0,
+                    "cheapest_vendor": "",
+                    "cheapest_website": "",
+                    "all_vendors": "",
+                    "all_websites": "",
+                    "results_count": 0,
+                    "status": f"Error: {str(e)}"
+                })
+        
+        # Generate output Excel
+        output_workbook = Workbook()
+        output_sheet = output_workbook.active
+        output_sheet.title = "Price Comparison Results"
+        
+        # Define styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4A90D9", end_color="4A90D9", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Write headers
+        headers = [
+            "S.No", "Product Name", "Location", "Min Price (₹)", "Median Price (₹)", 
+            "Max Price (₹)", "Cheapest Vendor", "Cheapest Website", 
+            "All Vendors", "All Websites", "Results Count", "Status"
+        ]
+        
+        for col_idx, header in enumerate(headers, start=1):
+            cell = output_sheet.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        # Write data
+        for row_idx, result in enumerate(results, start=2):
+            data = [
+                row_idx - 1,  # S.No
+                result['product'],
+                result['location'],
+                result['min_price'],
+                result['med_price'],
+                result['max_price'],
+                result['cheapest_vendor'],
+                result['cheapest_website'],
+                result['all_vendors'],
+                result['all_websites'],
+                result['results_count'],
+                result['status']
+            ]
+            
+            for col_idx, value in enumerate(data, start=1):
+                cell = output_sheet.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = thin_border
+                if col_idx in [4, 5, 6]:  # Price columns
+                    cell.alignment = Alignment(horizontal="right")
+                elif col_idx == 12:  # Status column
+                    if "Success" in str(value):
+                        cell.font = Font(color="008000")  # Green
+                    else:
+                        cell.font = Font(color="FF0000")  # Red
+        
+        # Adjust column widths
+        column_widths = [8, 35, 15, 15, 15, 15, 25, 40, 50, 50, 12, 20]
+        for col_idx, width in enumerate(column_widths, start=1):
+            output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+        
+        # Add summary row
+        summary_row = len(results) + 3
+        output_sheet.cell(row=summary_row, column=1, value="Summary").font = Font(bold=True)
+        output_sheet.cell(row=summary_row + 1, column=1, value="Total Products Processed:")
+        output_sheet.cell(row=summary_row + 1, column=2, value=len(results))
+        output_sheet.cell(row=summary_row + 2, column=1, value="Successful Searches:")
+        output_sheet.cell(row=summary_row + 2, column=2, value=sum(1 for r in results if r['status'] == 'Success'))
+        output_sheet.cell(row=summary_row + 3, column=1, value="Generated On:")
+        output_sheet.cell(row=summary_row + 3, column=2, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        
+        # Save to BytesIO
+        output_buffer = io.BytesIO()
+        output_workbook.save(output_buffer)
+        output_buffer.seek(0)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"PriceNexus_Results_{timestamp}.xlsx"
+        
+        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results.")
+        
+        # Return as downloadable file
+        return StreamingResponse(
+            output_buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={output_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bulk search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing Excel file: {str(e)}")
+
+@api_router.get("/bulk-search/template")
+async def download_template():
+    """Download a sample Excel template for bulk search"""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Products"
+    
+    # Headers
+    headers = ["Product Name", "Location (Optional)"]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4A90D9", end_color="4A90D9", fill_type="solid")
+    
+    for col_idx, header in enumerate(headers, start=1):
+        cell = sheet.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+    
+    # Sample data
+    sample_data = [
+        ["iPhone 15 Pro", "Mumbai"],
+        ["Samsung Galaxy S24", "Delhi"],
+        ["Sony WH-1000XM5 Headphones", "Bangalore"],
+        ["MacBook Air M3", ""],
+        ["Dell XPS 15 Laptop", "Chennai"],
+    ]
+    
+    for row_idx, data in enumerate(sample_data, start=2):
+        for col_idx, value in enumerate(data, start=1):
+            sheet.cell(row=row_idx, column=col_idx, value=value)
+    
+    # Adjust column widths
+    sheet.column_dimensions['A'].width = 40
+    sheet.column_dimensions['B'].width = 20
+    
+    # Add instructions
+    sheet.cell(row=9, column=1, value="Instructions:").font = Font(bold=True)
+    sheet.cell(row=10, column=1, value="1. Add your products in Column A (Product Name)")
+    sheet.cell(row=11, column=1, value="2. Optionally add location in Column B for location-specific search")
+    sheet.cell(row=12, column=1, value="3. Save and upload this file to get price comparison results")
+    
+    # Save to BytesIO
+    output_buffer = io.BytesIO()
+    workbook.save(output_buffer)
+    output_buffer.seek(0)
+    
+    return StreamingResponse(
+        output_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=PriceNexus_BulkSearch_Template.xlsx",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
