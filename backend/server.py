@@ -2672,54 +2672,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Bulk search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing Excel file: {str(e)}")
-            output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
-        
-        # Add summary row
-        summary_row = len(results) + 3
-        output_sheet.cell(row=summary_row, column=1, value="Summary").font = Font(bold=True)
-        output_sheet.cell(row=summary_row + 1, column=1, value="Total Products Processed:")
-        output_sheet.cell(row=summary_row + 1, column=2, value=len(results))
-        output_sheet.cell(row=summary_row + 2, column=1, value="Successful Searches:")
-        output_sheet.cell(row=summary_row + 2, column=2, value=sum(1 for r in results if r['status'] == 'Success'))
-        output_sheet.cell(row=summary_row + 3, column=1, value="Generated On:")
-        output_sheet.cell(row=summary_row + 3, column=2, value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        
-        # Save to BytesIO
-        output_buffer = io.BytesIO()
-        output_workbook.save(output_buffer)
-        output_buffer.seek(0)
-        
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"PriceNexus_Results_{timestamp}.xlsx"
-        
-        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results.")
-        
-        # Return as downloadable file
-        return StreamingResponse(
-            output_buffer,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename={output_filename}",
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Bulk search error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing Excel file: {str(e)}")
 
 @api_router.get("/bulk-search/template")
 async def download_template():
-    """Download a sample Excel template for bulk search"""
+    """Download a sample Excel template for bulk search with SL No and Item columns"""
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = "Products"
+    sheet.title = "Items"
     
-    # Headers
-    headers = ["Product Name", "Location (Optional)"]
+    # Headers - matching user's format
+    headers = ["SL No", "Item"]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(start_color="4A90D9", end_color="4A90D9", fill_type="solid")
     
@@ -2730,11 +2692,11 @@ async def download_template():
     
     # Sample data
     sample_data = [
-        ["iPhone 15 Pro", "Mumbai"],
-        ["Samsung Galaxy S24", "Delhi"],
-        ["Sony WH-1000XM5 Headphones", "Bangalore"],
-        ["MacBook Air M3", ""],
-        ["Dell XPS 15 Laptop", "Chennai"],
+        [1, "iPhone 15 Pro"],
+        [2, "Samsung Galaxy S24"],
+        [3, "Sony WH-1000XM5 Headphones"],
+        [4, "MacBook Air M3"],
+        [5, "Dell XPS 15 Laptop"],
     ]
     
     for row_idx, data in enumerate(sample_data, start=2):
@@ -2742,12 +2704,14 @@ async def download_template():
             sheet.cell(row=row_idx, column=col_idx, value=value)
     
     # Adjust column widths
-    sheet.column_dimensions['A'].width = 40
-    sheet.column_dimensions['B'].width = 20
+    sheet.column_dimensions['A'].width = 10
+    sheet.column_dimensions['B'].width = 40
     
     # Add instructions
     sheet.cell(row=9, column=1, value="Instructions:").font = Font(bold=True)
-    sheet.cell(row=10, column=1, value="1. Add your products in Column A (Product Name)")
+    sheet.cell(row=10, column=1, value="1. Add serial numbers in Column A (SL No)")
+    sheet.cell(row=11, column=1, value="2. Add item/product names in Column B (Item)")
+    sheet.cell(row=12, column=1, value="3. Save and upload this file to get price results")
     sheet.cell(row=11, column=1, value="2. Optionally add location in Column B for location-specific search")
     sheet.cell(row=12, column=1, value="3. Save and upload this file to get price comparison results")
     
