@@ -3209,14 +3209,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         mid_idx = len(sorted_prices) // 2
                         med_price = sorted_prices[mid_idx] if len(sorted_prices) % 2 == 1 else (sorted_prices[mid_idx - 1] + sorted_prices[mid_idx]) / 2
                         
-                        # Calculate market totals based on quantity using MINIMUM rate
+                        # Calculate market totals based on quantity for ALL rate types
                         min_total = min_price * quantity
+                        med_total = med_price * quantity
+                        max_total = max_price * quantity
                         
                         # Calculate differences (Your Amount - Market Min Amount)
                         # Positive = you're paying MORE than market (bad)
                         # Negative = you're paying LESS than market (good deal)
-                        rate_diff = user_rate - min_price if user_rate > 0 else 0
-                        amount_diff = user_amount - min_total if user_amount > 0 else 0
+                        rate_diff_min = user_rate - min_price if user_rate > 0 else 0
+                        amount_diff_min = user_amount - min_total if user_amount > 0 else 0
                         
                         # Get vendor/website info from validated results only
                         vendors = []
@@ -3238,8 +3240,12 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "user_amount": round(user_amount, 2),
                             "market_min_rate": round(min_price, 2),
                             "market_min_total": round(min_total, 2),
-                            "rate_diff": round(rate_diff, 2),
-                            "amount_diff": round(amount_diff, 2),
+                            "market_med_rate": round(med_price, 2),
+                            "market_med_total": round(med_total, 2),
+                            "market_max_rate": round(max_price, 2),
+                            "market_max_total": round(max_total, 2),
+                            "rate_diff": round(rate_diff_min, 2),
+                            "amount_diff": round(amount_diff_min, 2),
                             "website_links": "\n".join(websites[:5]),
                             "vendor_details": ", ".join(vendors[:10])
                         })
