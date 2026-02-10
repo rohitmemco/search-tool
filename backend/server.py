@@ -3514,16 +3514,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         savings_vs_min = your_grand_total - min_grand_total
         
         # Summary Header
-        output_sheet.merge_cells(f'A{summary_start_row}:K{summary_start_row}')
+        output_sheet.merge_cells(f'A{summary_start_row}:M{summary_start_row}')
         summary_header = output_sheet.cell(row=summary_start_row, column=1, value="CONSOLIDATED GST SUMMARY")
         summary_header.font = Font(bold=True, size=14, color="FFFFFF")
         summary_header.fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
         summary_header.alignment = Alignment(horizontal="center", vertical="center")
         
-        # Four-column summary layout
+        # Four-column summary layout (using wider spacing)
         summary_row = summary_start_row + 2
         
-        # Column headers for summary
+        # Column headers for summary - using columns A-B, D-E, G-H, J-K
         summary_headers = [
             ("A", "B", "YOUR PRICING", PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")),
             ("D", "E", "MARKET MINIMUM", PatternFill(start_color="548235", end_color="548235", fill_type="solid")),
