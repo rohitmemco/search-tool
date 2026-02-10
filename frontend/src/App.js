@@ -958,6 +958,232 @@ const ExportToExcel = ({ results, query }) => {
   );
 };
 
+// Bulk Upload Excel Component
+const BulkUploadExcel = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const downloadTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/bulk-search/template`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'PriceNexus_BulkSearch_Template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Template downloaded!");
+    } catch (error) {
+      toast.error("Failed to download template");
+    }
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast.error("Please upload an Excel file (.xlsx or .xls)");
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(10);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 5, 90));
+      }, 500);
+
+      const response = await axios.post(`${API}/bulk-search/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        responseType: 'blob',
+        timeout: 300000 // 5 min timeout for large files
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Download the result file
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from header or generate one
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'PriceNexus_Results.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Results Excel downloaded successfully!");
+      setIsOpen(false);
+    } catch (error) {
+      console.error('Upload error:', error);
+      if (error.response?.data) {
+        // Try to read error message from blob
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const errorData = JSON.parse(reader.result);
+            toast.error(errorData.detail || "Upload failed");
+          } catch {
+            toast.error("Failed to process Excel file");
+          }
+        };
+        reader.readAsText(error.response.data);
+      } else {
+        toast.error(error.message || "Failed to process Excel file");
+      }
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0]);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2" data-testid="bulk-upload-btn">
+          <FileSpreadsheet className="w-4 h-4" />
+          <span className="hidden sm:inline">Upload Excel</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+            Bulk Price Search
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Upload an Excel file with product names to get bulk price comparison. 
+            The system will search each product and generate a results file with min, median, and max prices.
+          </p>
+
+          {/* Upload Area */}
+          <div
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              dragActive 
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" 
+                : "border-slate-300 dark:border-slate-600 hover:border-blue-400"
+            } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            {isUploading ? (
+              <div className="space-y-3">
+                <Loader2 className="w-10 h-10 mx-auto text-blue-600 animate-spin" />
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Processing products... This may take a few minutes.
+                </p>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500">{uploadProgress}% complete</p>
+              </div>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-10 h-10 mx-auto text-slate-400 mb-3" />
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  Drag and drop your Excel file here, or
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleChange}
+                  className="hidden"
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mb-2"
+                >
+                  Browse Files
+                </Button>
+                <p className="text-xs text-slate-500">Supports .xlsx and .xls files</p>
+              </>
+            )}
+          </div>
+
+          {/* Template Download */}
+          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+            <div>
+              <p className="text-sm font-medium dark:text-white">Need a template?</p>
+              <p className="text-xs text-slate-500">Download our sample Excel template</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={downloadTemplate}>
+              <Download className="w-4 h-4 mr-2" /> Template
+            </Button>
+          </div>
+
+          {/* Format Info */}
+          <div className="text-xs text-slate-500 space-y-1">
+            <p className="font-medium text-slate-700 dark:text-slate-300">Excel Format:</p>
+            <p>• Column A: Product Name (required)</p>
+            <p>• Column B: Location/City (optional)</p>
+            <p>• Start data from Row 2 (Row 1 is header)</p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Price Distribution Chart
 const PriceDistributionChart = ({ results }) => {
   // Create price buckets
