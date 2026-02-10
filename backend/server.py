@@ -1838,6 +1838,14 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
         search = GoogleSearch(search_params)
         api_response = await loop.run_in_executor(None, search.get_dict)
         
+        # Check for API errors
+        if "error" in api_response:
+            error_msg = api_response.get("error", "Unknown error")
+            logger.error(f"SerpAPI Error: {error_msg}")
+            if "run out of searches" in error_msg.lower() or "quota" in error_msg.lower():
+                raise Exception("SerpAPI quota exhausted. Please add more credits to your SerpAPI account.")
+            return []
+        
         products = []
         currency_symbol = "₹" if params["currency"] == "INR" else "$" if params["currency"] == "USD" else params["currency"]
         
