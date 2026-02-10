@@ -3076,25 +3076,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         "user_amount": user_amount,
                         "query": item_name
                     })
-                        
-                        if quantity < 1:
-                            quantity = 1
-                    except (ValueError, TypeError) as e:
-                        logger.warning(f"Row {row_idx}: Could not parse quantity '{row[qty_col]}': {e}")
-                        quantity = 1
-                
-                if item_name and item_name.lower() not in ['item', 'product', 'name', 'description']:
-                    logger.info(f"Row {row_idx}: SL={sl_no}, Item={item_name[:30]}..., Qty={quantity}")
-                    products.append({
-                        "row": row_idx,
-                        "sl_no": sl_no,
-                        "item": item_name,
-                        "quantity": quantity,
-                        "query": item_name
-                    })
         
         if not products:
-            raise HTTPException(status_code=400, detail="No items found in Excel file. Please add SL No in Column A and Item names in Column B starting from row 2.")
+            raise HTTPException(status_code=400, detail="No items found in Excel file. Please ensure your Excel has columns for SL No, Item, Rate/Item, Qty, and Amount.")
         
         logger.info(f"Processing {len(products)} items from Excel upload")
         
@@ -3104,13 +3088,17 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             try:
                 logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']} (Qty: {product_info['quantity']})")
                 
-                # Search using SerpAPI
+                # Search using enhanced search (with fallback to free search)
                 search_results = await search_with_serpapi_enhanced(
                     query=product_info['query'],
                     original_item=product_info['item'],
                     country="india",
-                    max_results=30  # Get more results for better price validation
+                    max_results=30
                 )
+                
+                user_rate = product_info['user_rate']
+                user_amount = product_info['user_amount']
+                quantity = product_info['quantity']
                 
                 if search_results:
                     # Collect prices with their sources for validation
