@@ -3217,8 +3217,15 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         # Calculate differences (Your Amount - Market Min Amount)
                         # Positive = you're paying MORE than market (bad)
                         # Negative = you're paying LESS than market (good deal)
+                        # Calculate differences for ALL rate types (Min, Med, Max)
                         rate_diff_min = user_rate - min_price if user_rate > 0 else 0
                         amount_diff_min = user_amount - min_total if user_amount > 0 else 0
+                        
+                        rate_diff_med = user_rate - med_price if user_rate > 0 else 0
+                        amount_diff_med = user_amount - med_total if user_amount > 0 else 0
+                        
+                        rate_diff_max = user_rate - max_price if user_rate > 0 else 0
+                        amount_diff_max = user_amount - max_total if user_amount > 0 else 0
                         
                         # Get vendor/website info from validated results only
                         vendors = []
@@ -3240,12 +3247,16 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "user_amount": round(user_amount, 2),
                             "market_min_rate": round(min_price, 2),
                             "market_min_total": round(min_total, 2),
+                            "rate_diff_min": round(rate_diff_min, 2),
+                            "amount_diff_min": round(amount_diff_min, 2),
                             "market_med_rate": round(med_price, 2),
                             "market_med_total": round(med_total, 2),
+                            "rate_diff_med": round(rate_diff_med, 2),
+                            "amount_diff_med": round(amount_diff_med, 2),
                             "market_max_rate": round(max_price, 2),
                             "market_max_total": round(max_total, 2),
-                            "rate_diff": round(rate_diff_min, 2),
-                            "amount_diff": round(amount_diff_min, 2),
+                            "rate_diff_max": round(rate_diff_max, 2),
+                            "amount_diff_max": round(amount_diff_max, 2),
                             "website_links": "\n".join(websites[:5]),
                             "vendor_details": ", ".join(vendors[:10])
                         })
