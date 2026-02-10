@@ -2939,17 +2939,21 @@ def validate_and_filter_prices(prices_with_sources: list) -> list:
 @api_router.post("/bulk-search/upload")
 async def bulk_search_upload(file: UploadFile = File(...)):
     """
-    Upload an Excel file with product entries.
-    Process each product, search for prices, and return results as downloadable Excel.
+    Upload an Excel file with product entries and compare with market rates.
     
     Expected Excel format:
-    - Column A: SL No (Serial Number)
-    - Column B: Item (Product Name)
-    - Column C: Quantity (optional, defaults to 1)
+    - SL No (Serial Number)
+    - Item (Product Name)
+    - Rate/Item (Your rate per item)
+    - Qty (Quantity)
+    - Amount (Your total = Rate × Qty)
     
     Output Excel contains:
-    - SL No, Item, Quantity, Min Rate, Medium Rate, Max Rate
-    - Min Total, Medium Total, Max Total (Rate × Quantity)
+    - Your uploaded data (SL No, Item, Your Rate, Qty, Your Amount)
+    - Market rates (Min Rate, Medium Rate, Max Rate)
+    - Market totals (Min Total, Med Total, Max Total)
+    - Comparison (Rate Difference, Amount Difference)
+    - Highlighting: Green if you're paying less, Red if you're paying more
     - Website Links, Vendor Details
     """
     try:
@@ -2976,27 +2980,41 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         sl_col = None
         item_col = None
         qty_col = None
+        rate_col = None  # User's rate per item
+        amount_col = None  # User's total amount
         
         for idx, header in enumerate(header_row):
             if header:
                 header_lower = str(header).lower().strip()
-                if 'sl' in header_lower or 'serial' in header_lower or 'no' in header_lower or 's.no' in header_lower:
-                    sl_col = idx
-                elif 'item' in header_lower or 'product' in header_lower or 'name' in header_lower or 'description' in header_lower:
-                    item_col = idx
-                elif 'qty' in header_lower or 'quantity' in header_lower or 'quant' in header_lower:
+                if 'sl' in header_lower or 'serial' in header_lower or 's.no' in header_lower:
+                    if sl_col is None:
+                        sl_col = idx
+                elif 'item' in header_lower or 'product' in header_lower or 'description' in header_lower:
+                    if item_col is None:
+                        item_col = idx
+                elif 'rate' in header_lower and 'item' in header_lower:
+                    rate_col = idx
+                elif 'rate' in header_lower and rate_col is None:
+                    rate_col = idx
+                elif 'qty' in header_lower or 'quantity' in header_lower:
                     qty_col = idx
+                elif 'amount' in header_lower or 'total' in header_lower:
+                    amount_col = idx
         
         # Fallback to default positions if headers not found
         if sl_col is None:
             sl_col = 0
         if item_col is None:
             item_col = 1
+        if rate_col is None:
+            rate_col = 2
         if qty_col is None:
-            qty_col = 2
+            qty_col = 3
+        if amount_col is None:
+            amount_col = 4
         
-        logger.info(f"Detected columns - SL: {sl_col}, Item: {item_col}, Qty: {qty_col}")
-        logger.info(f"Headers found: {header_row[:5]}")
+        logger.info(f"Detected columns - SL: {sl_col}, Item: {item_col}, Rate: {rate_col}, Qty: {qty_col}, Amount: {amount_col}")
+        logger.info(f"Headers found: {header_row}")
         
         # Now extract data rows
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
@@ -3007,17 +3025,57 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 # Get Item name
                 item_name = str(row[item_col]).strip()
                 
-                # Get Quantity - check if column exists and has value
+                # Get User's Rate per Item
+                user_rate = 0
+                if rate_col is not None and rate_col < len(row) and row[rate_col] is not None:
+                    try:
+                        rate_value = row[rate_col]
+                        if isinstance(rate_value, (int, float)):
+                            user_rate = float(rate_value)
+                        else:
+                            user_rate = float(str(rate_value).strip().replace(',', ''))
+                    except (ValueError, TypeError):
+                        user_rate = 0
+                
+                # Get Quantity
                 quantity = 1
                 if qty_col is not None and qty_col < len(row) and row[qty_col] is not None:
                     try:
                         qty_value = row[qty_col]
-                        logger.info(f"Row {row_idx}: Raw quantity value = '{qty_value}' (type: {type(qty_value).__name__})")
-                        
                         if isinstance(qty_value, (int, float)):
                             quantity = int(qty_value)
                         else:
                             quantity = int(float(str(qty_value).strip().replace(',', '')))
+                        if quantity < 1:
+                            quantity = 1
+                    except (ValueError, TypeError):
+                        quantity = 1
+                
+                # Get User's Amount (or calculate from rate × qty)
+                user_amount = 0
+                if amount_col is not None and amount_col < len(row) and row[amount_col] is not None:
+                    try:
+                        amount_value = row[amount_col]
+                        if isinstance(amount_value, (int, float)):
+                            user_amount = float(amount_value)
+                        else:
+                            user_amount = float(str(amount_value).strip().replace(',', ''))
+                    except (ValueError, TypeError):
+                        user_amount = user_rate * quantity
+                else:
+                    user_amount = user_rate * quantity
+                
+                if item_name and item_name.lower() not in ['item', 'product', 'name', 'description']:
+                    logger.info(f"Row {row_idx}: SL={sl_no}, Item={item_name[:30]}..., Rate={user_rate}, Qty={quantity}, Amount={user_amount}")
+                    products.append({
+                        "row": row_idx,
+                        "sl_no": sl_no,
+                        "item": item_name,
+                        "user_rate": user_rate,
+                        "quantity": quantity,
+                        "user_amount": user_amount,
+                        "query": item_name
+                    })
                         
                         if quantity < 1:
                             quantity = 1
