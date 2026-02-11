@@ -1010,7 +1010,7 @@ const BulkUploadExcel = () => {
           'Content-Type': 'multipart/form-data',
         },
         responseType: 'blob',
-        timeout: 300000 // 5 min timeout for large files
+        timeout: 900000 // 15 min timeout for large files
       });
 
       clearInterval(progressInterval);
@@ -1543,7 +1543,13 @@ const ProductCard = ({ product, index, allProducts, view, selectedCurrency, onFa
         </Button>
       </div>
 
-      <img src={product.image} alt={product.name} className="product-card-image" loading="lazy" />
+      <img 
+        src={product.image_url || product.image || 'https://via.placeholder.com/300x200?text=No+Image'} 
+        alt={product.name} 
+        className="product-card-image" 
+        loading="lazy"
+        onError={(e) => { e.target.src = 'https://via.placeholder.com/300x200?text=No+Image'; }}
+      />
       <div className="product-card-content">
         <h3 className="product-card-title dark:text-white">{product.name}</h3>
         <p className="product-card-price">
@@ -2201,9 +2207,10 @@ const SearchPage = () => {
     const price = r.price;
     const meetsPrice = price >= filters.priceRange[0] && price <= filters.priceRange[1];
     const meetsRating = (r.rating || 0) >= filters.minRating;
-    const meetsAvailability = filters.availability.includes(r.availability);
+    // If no availability field, assume product is available (don't filter out)
+    const meetsAvailability = !r.availability || filters.availability.includes(r.availability);
     
-    // Advanced filters
+    // Advanced filters (only apply if field exists)
     const meetsBrand = !filters.selectedBrand || r.brand === filters.selectedBrand;
     const meetsModel = !filters.selectedModel || r.model === filters.selectedModel;
     const meetsColor = !filters.selectedColor || r.color === filters.selectedColor;

@@ -13,7 +13,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
-import random
 from datetime import datetime, timezone
 import asyncio
 from serpapi import GoogleSearch
@@ -22,7 +21,15 @@ import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus, urljoin, urlparse, parse_qs, urlencode, urlunparse
+import random as rand_module
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+import zipfile
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -48,6 +55,9 @@ except Exception as e:
 
 # SerpAPI configuration
 SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
+
+# RapidAPI configuration (FREE - 500+ requests/month across multiple product APIs)
+RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY', '')
 
 # Foursquare API configuration (disabled - requires payment)
 # GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
@@ -199,270 +209,12 @@ class UserMessage:
     def __init__(self, text=""):
         self.text = text
 
-async def detect_product_with_ai(query: str) -> Dict[str, Any]:
-    """Use AI to detect product information from user query"""
-    try:
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key or not EMERGENT_AVAILABLE:
-            if not EMERGENT_AVAILABLE:
-                logger.info("AI package not available, using fallback product detection")
-            else:
-                logger.warning("No EMERGENT_LLM_KEY found, using fallback")
-            return fallback_product_detection(query)
-        
-        # Check for obviously fictional/impossible items first
-        fictional_keywords = [
-            "unicorn", "dragon", "magic", "wizard", "fairy", "mythical", 
-            "time machine", "teleporter", "perpetual motion", "infinity",
-            "impossible", "fictional", "fantasy", "imaginary"
-        ]
-        query_lower = query.lower()
-        for keyword in fictional_keywords:
-            if keyword in query_lower:
-                return {
-                    "is_searchable": False,
-                    "product_name": query,
-                    "products": [],
-                    "brands": [],
-                    "price_range_min": 0,
-                    "price_range_max": 0,
-                    "unit": "per piece",
-                    "descriptions": [],
-                    "category": "Unknown"
-                }
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"product-detection-{uuid.uuid4()}",
-            system_message="""You are a strict product analysis AI. Analyze user queries and extract product information.
-Return ONLY valid JSON with no markdown formatting, no code blocks, just the raw JSON object.
-You must identify REAL, COMMERCIALLY AVAILABLE products only. 
-DO NOT try to be creative or find alternatives. If a product is fictional, mythical, or doesn't exist as a real commercial product, set is_searchable to false."""
-        )
-        chat.with_model("openai", "gpt-5.2")
-        
-        prompt = f"""Analyze this search query and extract product information: "{query}"
-
-Return a JSON object with exactly this structure (no markdown, no code blocks):
-{{
-    "is_searchable": true or false (MUST be false if: 1) product is fictional/mythical/imaginary, 2) product doesn't exist commercially, 3) search term is abstract concept, 4) product name contains fantasy elements),
-    "product_name": "main product name",
-    "products": ["variation 1", "variation 2", "variation 3", "variation 4", "variation 5"],
-    "brands": ["brand1", "brand2", "brand3", "brand4", "brand5"],
-    "models": ["Model A", "Model B Pro", "Model C Plus", "Model D Max", "Model E Lite"],
-    "colors": ["Black", "White", "Silver", "Blue", "Red", "Gold", "Green"],
-    "sizes": ["Small", "Medium", "Large", "XL", "XXL"] or ["32GB", "64GB", "128GB", "256GB", "512GB"] or ["13 inch", "14 inch", "15 inch", "17 inch"] or appropriate sizes for the product,
-    "specifications": {{
-        "spec_type_1": ["option1", "option2", "option3"],
-        "spec_type_2": ["option1", "option2", "option3"],
-        "spec_type_3": ["option1", "option2", "option3"]
-    }},
-    "materials": ["Material 1", "Material 2", "Material 3"],
-    "price_range_min": minimum typical price in INR (0 if not searchable),
-    "price_range_max": maximum typical price in INR (0 if not searchable),
-    "unit": "per piece" or "per kg" or appropriate unit,
-    "descriptions": ["feature 1", "feature 2", "feature 3", "feature 4", "feature 5"],
-    "category": "Electronics/Fashion/Home/Construction/Food/etc"
-}}
-
-SPECIFICATION EXAMPLES BY CATEGORY:
-- Electronics (laptops): {{"RAM": ["4GB", "8GB", "16GB", "32GB"], "Storage": ["256GB SSD", "512GB SSD", "1TB SSD"], "Processor": ["Intel i3", "Intel i5", "Intel i7", "AMD Ryzen 5", "AMD Ryzen 7"]}}
-- Electronics (phones): {{"Storage": ["64GB", "128GB", "256GB"], "RAM": ["4GB", "6GB", "8GB", "12GB"], "Camera": ["12MP", "48MP", "64MP", "108MP"]}}
-- Fashion (clothing): {{"Fit": ["Slim Fit", "Regular Fit", "Loose Fit"], "Fabric": ["Cotton", "Polyester", "Linen", "Wool"], "Style": ["Casual", "Formal", "Sports"]}}
-- Fashion (shoes): {{"Type": ["Running", "Casual", "Formal", "Sports"], "Sole": ["Rubber", "EVA", "Leather"], "Closure": ["Lace-up", "Slip-on", "Velcro"]}}
-- Home/Furniture: {{"Material": ["Wood", "Metal", "Plastic", "Glass"], "Style": ["Modern", "Traditional", "Minimalist"], "Assembly": ["Pre-assembled", "DIY Assembly"]}}
-
-CRITICAL RULES:
-- Set is_searchable to FALSE for anything fictional, mythical, impossible, or not commercially sold
-- DO NOT try to find creative alternatives or similar real products
-- If the exact product doesn't exist in real markets, is_searchable MUST be false
-- Provide product-appropriate sizes (clothing sizes for clothes, storage sizes for electronics, screen sizes for TVs/laptops)
-- Provide realistic specifications based on product category
-- Provide realistic colors that the product actually comes in
-- Provide 5 real product variations with different specs/models
-- Provide 5 real brands that make this product
-- Provide realistic price ranges in Indian Rupees (INR)"""
-
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
-        
-        # Parse JSON response
-        import json
-        response_text = response.strip()
-        # Remove markdown code blocks if present
-        if response_text.startswith("```"):
-            lines = response_text.split("\n")
-            response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-        
-        product_data = json.loads(response_text)
-        return product_data
-        
-    except Exception as e:
-        logger.error(f"AI product detection error: {e}")
-        return fallback_product_detection(query)
-
-def fallback_product_detection(query: str) -> Dict[str, Any]:
-    """Fallback product detection when AI is unavailable"""
-    query_lower = query.lower()
-    
-    # Check for common product categories with advanced attributes
-    categories = {
-        "laptop": {
-            "products": ["Gaming Laptop 15.6\"", "Business Ultrabook 14\"", "Student Laptop 13\"", "Workstation 17\"", "2-in-1 Convertible"],
-            "brands": ["Dell", "HP", "Lenovo", "ASUS", "Acer"],
-            "models": ["XPS 15", "ThinkPad X1", "ROG Zephyrus", "ZenBook Pro", "MacBook Air"],
-            "colors": ["Silver", "Black", "Space Gray", "White", "Blue"],
-            "sizes": ["13 inch", "14 inch", "15 inch", "16 inch", "17 inch"],
-            "specifications": {
-                "RAM": ["8GB", "16GB", "32GB", "64GB"],
-                "Storage": ["256GB SSD", "512GB SSD", "1TB SSD", "2TB SSD"],
-                "Processor": ["Intel i5", "Intel i7", "Intel i9", "AMD Ryzen 5", "AMD Ryzen 7", "Apple M3"]
-            },
-            "materials": ["Aluminum", "Carbon Fiber", "Magnesium Alloy", "Plastic"],
-            "price_range": (25000, 150000),
-            "descriptions": ["High performance processor", "SSD storage", "Full HD display", "Long battery life", "Lightweight design"]
-        },
-        "phone": {
-            "products": ["Pro Max", "Standard", "Lite", "Ultra", "Plus"],
-            "brands": ["Apple", "Samsung", "OnePlus", "Xiaomi", "Google"],
-            "models": ["iPhone 15 Pro", "Galaxy S24", "Pixel 8", "OnePlus 12", "Mi 14"],
-            "colors": ["Black", "White", "Blue", "Purple", "Gold", "Silver", "Green"],
-            "sizes": ["64GB", "128GB", "256GB", "512GB", "1TB"],
-            "specifications": {
-                "RAM": ["6GB", "8GB", "12GB", "16GB"],
-                "Camera": ["12MP", "48MP", "50MP", "108MP", "200MP"],
-                "Display": ["6.1 inch", "6.5 inch", "6.7 inch", "6.8 inch"]
-            },
-            "materials": ["Glass", "Titanium", "Aluminum", "Ceramic"],
-            "price_range": (10000, 150000),
-            "descriptions": ["5G connectivity", "AMOLED display", "Fast charging", "AI camera system", "Premium build"]
-        },
-        "iphone": {
-            "products": ["iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 14"],
-            "brands": ["Apple"],
-            "models": ["iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max"],
-            "colors": ["Black", "White", "Blue", "Pink", "Yellow", "Natural Titanium", "Blue Titanium"],
-            "sizes": ["128GB", "256GB", "512GB", "1TB"],
-            "specifications": {
-                "Chip": ["A16 Bionic", "A17 Pro"],
-                "Camera": ["48MP Main", "48MP Ultra Wide", "12MP Telephoto"],
-                "Display": ["6.1 inch", "6.7 inch"]
-            },
-            "materials": ["Titanium", "Aluminum", "Ceramic Shield"],
-            "price_range": (70000, 180000),
-            "descriptions": ["A17 Pro chip", "ProMotion display", "Action button", "USB-C", "Ceramic Shield"]
-        },
-        "tv": {
-            "products": ["55-inch 4K LED", "65-inch OLED", "43-inch Smart TV", "75-inch QLED", "50-inch Android TV"],
-            "brands": ["Samsung", "LG", "Sony", "TCL", "Mi"],
-            "models": ["Neo QLED", "C3 OLED", "Bravia XR", "Fire TV", "Google TV"],
-            "colors": ["Black", "Silver", "White", "Titan Black"],
-            "sizes": ["32 inch", "43 inch", "50 inch", "55 inch", "65 inch", "75 inch", "85 inch"],
-            "specifications": {
-                "Resolution": ["Full HD", "4K UHD", "8K UHD"],
-                "Panel": ["LED", "OLED", "QLED", "Mini LED"],
-                "Refresh Rate": ["60Hz", "120Hz", "144Hz"]
-            },
-            "materials": ["Metal Stand", "Plastic Frame", "Slim Bezel"],
-            "price_range": (20000, 300000),
-            "descriptions": ["4K Ultra HD", "Smart TV features", "Dolby Vision", "HDR support", "Voice control"]
-        },
-        "headphone": {
-            "products": ["Wireless ANC", "Gaming Headset", "Studio Monitor", "True Wireless Earbuds", "Sports Earphones"],
-            "brands": ["Sony", "Bose", "JBL", "Sennheiser", "Apple"],
-            "models": ["WH-1000XM5", "AirPods Pro", "QuietComfort", "Momentum 4", "Free Buds"],
-            "colors": ["Black", "White", "Silver", "Blue", "Beige", "Midnight Blue"],
-            "sizes": ["One Size", "Small Tips", "Medium Tips", "Large Tips"],
-            "specifications": {
-                "Driver": ["30mm", "40mm", "50mm"],
-                "Battery": ["20 hours", "30 hours", "40 hours", "60 hours"],
-                "Connectivity": ["Bluetooth 5.0", "Bluetooth 5.2", "Bluetooth 5.3"]
-            },
-            "materials": ["Leather", "Memory Foam", "Silicone", "Plastic"],
-            "price_range": (2000, 40000),
-            "descriptions": ["Active noise cancellation", "Hi-Fi audio", "Long battery life", "Comfortable fit", "Premium sound"]
-        },
-        "shoe": {
-            "products": ["Running Shoes", "Casual Sneakers", "Basketball Shoes", "Training Shoes", "Lifestyle Sneakers"],
-            "brands": ["Nike", "Adidas", "Puma", "Reebok", "New Balance"],
-            "models": ["Air Max", "Ultraboost", "RS-X", "Classic Leather", "574"],
-            "colors": ["Black", "White", "Red", "Blue", "Gray", "Multi-color"],
-            "sizes": ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11", "UK 12"],
-            "specifications": {
-                "Type": ["Running", "Training", "Casual", "Basketball", "Walking"],
-                "Closure": ["Lace-up", "Slip-on", "Velcro"],
-                "Sole": ["Rubber", "EVA", "Boost", "Air Max", "React"]
-            },
-            "materials": ["Mesh", "Leather", "Synthetic", "Knit", "Canvas"],
-            "price_range": (2000, 25000),
-            "descriptions": ["Comfortable cushioning", "Breathable material", "Durable sole", "Stylish design", "Lightweight"]
-        },
-        "shirt": {
-            "products": ["Formal Shirt", "Casual Shirt", "T-Shirt", "Polo Shirt", "Oxford Shirt"],
-            "brands": ["Allen Solly", "Van Heusen", "Peter England", "Louis Philippe", "Arrow"],
-            "models": ["Slim Fit", "Regular Fit", "Relaxed Fit", "Classic Fit"],
-            "colors": ["White", "Blue", "Black", "Pink", "Gray", "Navy", "Striped"],
-            "sizes": ["S", "M", "L", "XL", "XXL", "XXXL"],
-            "specifications": {
-                "Fit": ["Slim Fit", "Regular Fit", "Relaxed Fit"],
-                "Sleeve": ["Full Sleeve", "Half Sleeve", "Sleeveless"],
-                "Collar": ["Spread Collar", "Button Down", "Mandarin", "Round Neck"]
-            },
-            "materials": ["Cotton", "Linen", "Polyester", "Cotton Blend", "Oxford"],
-            "price_range": (500, 5000),
-            "descriptions": ["Premium cotton", "Wrinkle-free", "Breathable fabric", "Easy care", "Classic style"]
-        }
-    }
-    
-    # Find matching category - prioritize more specific matches first
-    # Sort keys by length (longest first) to match "iphone" before "phone"
-    matched_category = None
-    sorted_keys = sorted(categories.keys(), key=len, reverse=True)
-    for key in sorted_keys:
-        if key in query_lower:
-            matched_category = key
-            break
-    
-    if matched_category:
-        cat_data = categories[matched_category]
-        return {
-            "is_searchable": True,
-            "product_name": matched_category.title(),
-            "products": cat_data["products"],
-            "brands": cat_data["brands"],
-            "models": cat_data.get("models", []),
-            "colors": cat_data.get("colors", []),
-            "sizes": cat_data.get("sizes", []),
-            "specifications": cat_data.get("specifications", {}),
-            "materials": cat_data.get("materials", []),
-            "price_range_min": cat_data["price_range"][0],
-            "price_range_max": cat_data["price_range"][1],
-            "unit": "per piece",
-            "descriptions": cat_data["descriptions"],
-            "category": matched_category.title()
-        }
-    
-    # Generic fallback for unknown products
-    return {
-        "is_searchable": True,
-        "product_name": query.title(),
-        "products": [f"{query} Model A", f"{query} Model B", f"{query} Pro", f"{query} Standard", f"{query} Premium"],
-        "brands": ["Brand A", "Brand B", "Brand C", "Brand D", "Brand E"],
-        "models": ["Standard", "Pro", "Plus", "Max", "Lite"],
-        "colors": ["Black", "White", "Silver", "Blue", "Red"],
-        "sizes": ["Small", "Medium", "Large", "XL"],
-        "specifications": {},
-        "materials": [],
-        "price_range_min": 1000,
-        "price_range_max": 50000,
-        "unit": "per piece",
-        "descriptions": ["High quality", "Best seller", "Customer favorite", "Value for money", "Premium quality"],
-        "category": "General"
-    }
+# ================== LOCATION AND CURRENCY ==================
 
 def extract_location(query: str) -> Dict[str, str]:
     """Extract location from query"""
     query_lower = query.lower()
+
     
     # Check for country keywords first
     for keyword, country in COUNTRY_KEYWORDS.items():
@@ -507,7 +259,7 @@ async def discover_marketplaces_with_ai(product_name: str, category: str, countr
             session_id=f"marketplace-discovery-{uuid.uuid4()}",
             system_message="You are a marketplace expert. Return ONLY valid JSON with no extra text."
         )
-        chat.with_model("openai", "gpt-5.2")
+        chat.with_model("openai", "gpt-4o")
         
         prompt = f"""Find REAL marketplaces where "{product_name}" (category: {category}) is sold in {country.upper()}.
         
@@ -578,391 +330,11 @@ def get_fallback_marketplaces(country: str, source_type: str) -> List[Dict[str, 
     }
     return fallback.get(source_type, fallback["online_marketplaces"])
 
-def generate_vendor_details(marketplace_name: str, source_type: str, location_data: Dict) -> Dict[str, Any]:
-    """Generate realistic vendor details based on marketplace and location"""
-    
-    # Vendor name prefixes based on source type
-    vendor_prefixes = {
-        "global_suppliers": ["Global", "International", "World", "Premier", "Elite", "Continental", "Universal"],
-        "local_markets": ["City", "Metro", "Local", "Urban", "Neighborhood", "District", "Regional"],
-        "online_marketplaces": ["Digital", "Online", "E-", "Smart", "Quick", "Express", "Prime"]
-    }
-    
-    # Vendor name suffixes
-    vendor_suffixes = ["Traders", "Suppliers", "Distributors", "Enterprises", "Solutions", "Commerce", "Mart", "Hub", "Store", "Deals"]
-    
-    # Generate vendor name
-    prefix = random.choice(vendor_prefixes.get(source_type, vendor_prefixes["online_marketplaces"]))
-    suffix = random.choice(vendor_suffixes)
-    vendor_name = f"{prefix} {suffix}"
-    
-    # Location-specific data with REAL cities and proper addresses
-    country = location_data.get("country", "global").lower()
-    detected_city = location_data.get("city", "")
-    
-    # Country-specific address formats with real cities and postal codes
-    address_data = {
-        "india": {
-            "cities": [
-                {"name": "Mumbai", "state": "Maharashtra", "postal": "400001", "area": "Andheri East"},
-                {"name": "Mumbai", "state": "Maharashtra", "postal": "400069", "area": "Powai"},
-                {"name": "Delhi", "state": "Delhi", "postal": "110001", "area": "Connaught Place"},
-                {"name": "Delhi", "state": "Delhi", "postal": "110020", "area": "Nehru Place"},
-                {"name": "Bangalore", "state": "Karnataka", "postal": "560001", "area": "MG Road"},
-                {"name": "Bangalore", "state": "Karnataka", "postal": "560066", "area": "Electronic City"},
-                {"name": "Chennai", "state": "Tamil Nadu", "postal": "600002", "area": "Anna Salai"},
-                {"name": "Chennai", "state": "Tamil Nadu", "postal": "600032", "area": "Guindy"},
-                {"name": "Hyderabad", "state": "Telangana", "postal": "500034", "area": "HITEC City"},
-                {"name": "Hyderabad", "state": "Telangana", "postal": "500081", "area": "Madhapur"},
-                {"name": "Pune", "state": "Maharashtra", "postal": "411001", "area": "Camp"},
-                {"name": "Pune", "state": "Maharashtra", "postal": "411057", "area": "Hinjewadi"},
-                {"name": "Kolkata", "state": "West Bengal", "postal": "700001", "area": "BBD Bagh"},
-                {"name": "Ahmedabad", "state": "Gujarat", "postal": "380009", "area": "CG Road"},
-            ],
-            "streets": ["MG Road", "Brigade Road", "Anna Salai", "Park Street", "FC Road", "Linking Road", "Commercial Street", "Station Road", "NH Highway", "Ring Road"],
-            "landmarks": ["Near Metro Station", "Opp. City Mall", "Behind Trade Center", "Next to IT Park", "Industrial Estate"],
-            "phone_prefix": "+91",
-            "domain": ".in"
-        },
-        "usa": {
-            "cities": [
-                {"name": "New York", "state": "NY", "postal": "10001", "area": "Midtown Manhattan"},
-                {"name": "New York", "state": "NY", "postal": "10012", "area": "SoHo"},
-                {"name": "Los Angeles", "state": "CA", "postal": "90001", "area": "Downtown LA"},
-                {"name": "Los Angeles", "state": "CA", "postal": "90210", "area": "Beverly Hills"},
-                {"name": "Chicago", "state": "IL", "postal": "60601", "area": "The Loop"},
-                {"name": "Chicago", "state": "IL", "postal": "60611", "area": "Magnificent Mile"},
-                {"name": "Houston", "state": "TX", "postal": "77001", "area": "Downtown Houston"},
-                {"name": "San Francisco", "state": "CA", "postal": "94102", "area": "Financial District"},
-                {"name": "Seattle", "state": "WA", "postal": "98101", "area": "Downtown Seattle"},
-                {"name": "Boston", "state": "MA", "postal": "02101", "area": "Financial District"},
-                {"name": "Miami", "state": "FL", "postal": "33101", "area": "Downtown Miami"},
-                {"name": "Dallas", "state": "TX", "postal": "75201", "area": "Downtown Dallas"},
-            ],
-            "streets": ["Main Street", "Commerce Drive", "Business Boulevard", "Trade Avenue", "Market Street", "Industrial Way", "Technology Park", "Corporate Center"],
-            "landmarks": ["Suite", "Floor", "Building", "Plaza", "Tower"],
-            "phone_prefix": "+1",
-            "domain": ".com"
-        },
-        "uk": {
-            "cities": [
-                {"name": "London", "state": "England", "postal": "EC1A 1BB", "area": "City of London"},
-                {"name": "London", "state": "England", "postal": "W1D 3QU", "area": "West End"},
-                {"name": "London", "state": "England", "postal": "E14 5AB", "area": "Canary Wharf"},
-                {"name": "Manchester", "state": "England", "postal": "M1 1AD", "area": "City Centre"},
-                {"name": "Birmingham", "state": "England", "postal": "B1 1AA", "area": "City Centre"},
-                {"name": "Leeds", "state": "England", "postal": "LS1 1AA", "area": "City Centre"},
-                {"name": "Glasgow", "state": "Scotland", "postal": "G1 1AA", "area": "City Centre"},
-                {"name": "Edinburgh", "state": "Scotland", "postal": "EH1 1AA", "area": "Old Town"},
-            ],
-            "streets": ["High Street", "Market Lane", "Commerce Road", "Trade Street", "Business Way", "Oxford Street", "King Street", "Queen Street"],
-            "landmarks": ["Unit", "Floor", "Building", "House", "Centre"],
-            "phone_prefix": "+44",
-            "domain": ".co.uk"
-        },
-        "uae": {
-            "cities": [
-                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 12345", "area": "Business Bay"},
-                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 23456", "area": "DIFC"},
-                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 34567", "area": "Deira"},
-                {"name": "Dubai", "state": "Dubai", "postal": "P.O. Box 45678", "area": "Jumeirah"},
-                {"name": "Abu Dhabi", "state": "Abu Dhabi", "postal": "P.O. Box 56789", "area": "Al Reem Island"},
-                {"name": "Abu Dhabi", "state": "Abu Dhabi", "postal": "P.O. Box 67890", "area": "Corniche"},
-                {"name": "Sharjah", "state": "Sharjah", "postal": "P.O. Box 78901", "area": "Industrial Area"},
-            ],
-            "streets": ["Sheikh Zayed Road", "Al Maktoum Street", "Khalid Bin Waleed Road", "Al Rigga Road", "Jumeirah Beach Road", "Al Wasl Road"],
-            "landmarks": ["Office", "Tower", "Building", "Centre", "Plaza"],
-            "phone_prefix": "+971",
-            "domain": ".ae"
-        }
-    }
-    
-    # Get country-specific data or use USA as default
-    country_data = address_data.get(country, address_data["usa"])
-    
-    # Select a real city - prefer detected city or random from country
-    city_info = None
-    if detected_city and detected_city not in ["Various Cities", "Global", "Nationwide"]:
-        # Try to find the detected city in our data
-        for c in country_data["cities"]:
-            if detected_city.lower() in c["name"].lower():
-                city_info = c
-                break
-    
-    # If no match, pick a random city from the country
-    if not city_info:
-        city_info = random.choice(country_data["cities"])
-    
-    # Generate realistic address
-    street_num = random.randint(1, 500)
-    street = random.choice(country_data["streets"])
-    landmark = random.choice(country_data["landmarks"])
-    
-    if country == "usa":
-        # US format: 123 Main Street, Suite 456, Area, City, State ZIP
-        suite_num = random.randint(100, 999)
-        full_address = f"{street_num} {street}, {landmark} {suite_num}, {city_info['area']}, {city_info['name']}, {city_info['state']} {city_info['postal']}"
-    elif country == "uk":
-        # UK format: Unit 12, 123 High Street, Area, City, Postal
-        unit_num = random.randint(1, 50)
-        full_address = f"{landmark} {unit_num}, {street_num} {street}, {city_info['area']}, {city_info['name']}, {city_info['postal']}"
-    elif country == "uae":
-        # UAE format: Office 123, Tower Name, Street, Area, City, P.O. Box
-        office_num = random.randint(100, 999)
-        full_address = f"{landmark} {office_num}, {street_num} {street}, {city_info['area']}, {city_info['name']}, {city_info['postal']}"
-    else:
-        # India/Default format: 123, Street Name, Area, Near Landmark, City, State - PIN
-        full_address = f"{street_num}, {street}, {city_info['area']}, {landmark}, {city_info['name']}, {city_info['state']} - {city_info['postal']}"
-    
-    # Generate contact details with proper formatting
-    if country == "india":
-        # Indian mobile: +91 98765 43210
-        phone = f"+91 {random.randint(70000, 99999)} {random.randint(10000, 99999)}"
-    elif country == "usa":
-        # US format: +1 (555) 123-4567
-        phone = f"+1 ({random.randint(200, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}"
-    elif country == "uk":
-        # UK format: +44 20 1234 5678
-        phone = f"+44 {random.randint(20, 79)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
-    elif country == "uae":
-        # UAE format: +971 4 123 4567
-        phone = f"+971 {random.choice(['4', '2', '6'])} {random.randint(100, 999)} {random.randint(1000, 9999)}"
-    else:
-        phone = f"+1 ({random.randint(200, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}"
-    
-    # Generate business email
-    vendor_email_name = vendor_name.lower().replace(" ", "").replace("-", "")
-    business_domains = [
-        f"sales{country_data.get('domain', '.com')}",
-        f"info{country_data.get('domain', '.com')}",
-        f"{vendor_email_name[:10]}{country_data.get('domain', '.com')}",
-        "gmail.com"
-    ]
-    email = f"{vendor_email_name}@{random.choice(business_domains)}"
-    
-    # Generate additional details
-    years_in_business = random.randint(2, 25)
-    response_time = random.choice(["Within 1 hour", "Within 24 hours", "1-2 business days", "Same day"])
-    verification_status = random.choice(["Verified Seller", "Premium Vendor", "Trusted Supplier", "Gold Member", "Standard"])
-    
-    return {
-        "vendor_name": vendor_name,
-        "vendor_email": email,
-        "vendor_phone": phone,
-        "vendor_address": full_address,
-        "vendor_city": city_info["name"],
-        "vendor_country": location_data.get("country", "Global").upper(),
-        "vendor_type": source_type.replace("_", " ").title(),
-        "years_in_business": years_in_business,
-        "response_time": response_time,
-        "verification_status": verification_status,
-        "business_hours": "Mon-Sat: 9:00 AM - 6:00 PM" if source_type == "local_markets" else "24/7 Online Support"
-    }
-
-# ================== VENDOR DETAILS FOR REAL SOURCES ==================
-def generate_vendor_for_real_source(source_name: str, location_data: Dict, price: float) -> Dict:
-    """
-    Generate vendor details based on the real source/seller name from SerpAPI.
-    Classifies vendors as: Online Marketplace, Factory/Manufacturer, Wholesaler, Local Shop, etc.
-    Uses the search location to generate relevant addresses.
-    """
-    source_lower = source_name.lower()
-    
-    # Known vendor type classifications
-    online_marketplaces = ["amazon", "flipkart", "myntra", "ajio", "tata cliq", "snapdeal", "meesho", 
-                          "ebay", "walmart", "target", "best buy", "newegg", "jiomart", "reliance digital",
-                          "croma", "vijay sales", "poorvika", "sangeetha"]
-    
-    wholesalers_b2b = ["indiamart", "tradeindia", "alibaba", "aliexpress", "dhgate", "made-in-china",
-                      "global sources", "ec21", "exporters", "wholesale", "bulk", "b2b", "trade"]
-    
-    factories_manufacturers = ["factory", "manufacturer", "manufacturing", "industries", "pvt ltd", 
-                              "private limited", "ltd", "limited", "enterprise", "works", "mills",
-                              "production", "oem", "odm"]
-    
-    local_shops = ["mobile", "electronics", "store", "shop", "mart", "bazar", "bazaar", "retail",
-                   "dealer", "showroom", "outlet", "center", "centre", "emporium", "cashify",
-                   "olx", "quikr", "2gud", "refurbished"]
-    
-    # Determine vendor type based on source name
-    vendor_type = "Online Marketplace"
-    business_type = "E-commerce Platform"
-    
-    if any(kw in source_lower for kw in factories_manufacturers):
-        vendor_type = "Factory / Manufacturer"
-        business_type = "Manufacturing Unit"
-    elif any(kw in source_lower for kw in wholesalers_b2b):
-        vendor_type = "Wholesale Supplier"
-        business_type = "B2B Wholesale"
-    elif any(kw in source_lower for kw in local_shops):
-        vendor_type = "Local Retail Shop"
-        business_type = "Authorized Retailer"
-    elif any(kw in source_lower for kw in online_marketplaces):
-        vendor_type = "Online Marketplace"
-        business_type = "E-commerce Platform"
-    else:
-        # Check price to guess vendor type
-        if price > 50000:
-            vendor_type = "Authorized Dealer"
-            business_type = "Premium Retailer"
-        elif price < 5000:
-            vendor_type = "Local Retail Shop"
-            business_type = "Retail Store"
-        else:
-            vendor_type = "Online Seller"
-            business_type = "Verified Seller"
-    
-    # Get location from search query - use city if available
-    search_city = location_data.get("city", "").lower()
-    country = location_data.get("country", "india").lower()
-    
-    # City-specific street data
-    city_street_data = {
-        # India
-        "mumbai": {"name": "Mumbai", "state": "Maharashtra", "country": "india", "streets": ["Andheri West", "Bandra East", "Dadar", "Powai", "Malad West", "Worli", "Lower Parel"]},
-        "delhi": {"name": "Delhi", "state": "Delhi NCR", "country": "india", "streets": ["Nehru Place", "Karol Bagh", "Lajpat Nagar", "Connaught Place", "Chandni Chowk", "Saket", "Dwarka"]},
-        "bangalore": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
-        "bengaluru": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
-        "banglore": {"name": "Bangalore", "state": "Karnataka", "country": "india", "streets": ["Koramangala", "Indiranagar", "Whitefield", "Electronic City", "MG Road", "HSR Layout", "Jayanagar"]},
-        "chennai": {"name": "Chennai", "state": "Tamil Nadu", "country": "india", "streets": ["T Nagar", "Anna Nagar", "Adyar", "Mylapore", "Velachery", "Nungambakkam", "Guindy"]},
-        "hyderabad": {"name": "Hyderabad", "state": "Telangana", "country": "india", "streets": ["Ameerpet", "Kukatpally", "Hitech City", "Secunderabad", "Banjara Hills", "Gachibowli", "Madhapur"]},
-        "kolkata": {"name": "Kolkata", "state": "West Bengal", "country": "india", "streets": ["Park Street", "Salt Lake", "Howrah", "Esplanade", "New Market", "Ballygunge", "Gariahat"]},
-        "pune": {"name": "Pune", "state": "Maharashtra", "country": "india", "streets": ["Hinjewadi", "Kothrud", "Viman Nagar", "Wakad", "FC Road", "Shivaji Nagar", "Deccan"]},
-        "ahmedabad": {"name": "Ahmedabad", "state": "Gujarat", "country": "india", "streets": ["CG Road", "SG Highway", "Satellite", "Navrangpura", "Vastrapur", "Bodakdev", "Prahlad Nagar"]},
-        "jaipur": {"name": "Jaipur", "state": "Rajasthan", "country": "india", "streets": ["MI Road", "Vaishali Nagar", "Malviya Nagar", "Raja Park", "C Scheme", "Mansarovar", "Tonk Road"]},
-        "lucknow": {"name": "Lucknow", "state": "Uttar Pradesh", "country": "india", "streets": ["Hazratganj", "Gomti Nagar", "Aminabad", "Alambagh", "Chowk", "Indira Nagar", "Aliganj"]},
-        "india": {"name": "Mumbai", "state": "Maharashtra", "country": "india", "streets": ["Andheri West", "Bandra East", "Dadar", "Powai", "Malad West"]},
-        # USA
-        "new york": {"name": "New York", "state": "NY", "country": "usa", "streets": ["5th Avenue", "Broadway", "Wall Street", "Madison Avenue", "Times Square", "Park Avenue"]},
-        "los angeles": {"name": "Los Angeles", "state": "CA", "country": "usa", "streets": ["Hollywood Blvd", "Rodeo Drive", "Venice Beach", "Santa Monica Blvd", "Sunset Blvd", "Wilshire Blvd"]},
-        "chicago": {"name": "Chicago", "state": "IL", "country": "usa", "streets": ["Michigan Avenue", "State Street", "Wacker Drive", "Oak Street", "Lincoln Park", "Navy Pier"]},
-        "san francisco": {"name": "San Francisco", "state": "CA", "country": "usa", "streets": ["Market Street", "Union Square", "Fisherman's Wharf", "Mission District", "SOMA", "Embarcadero"]},
-        "usa": {"name": "New York", "state": "NY", "country": "usa", "streets": ["5th Avenue", "Broadway", "Wall Street", "Madison Avenue", "Times Square"]},
-        # UK
-        "london": {"name": "London", "state": "England", "country": "uk", "streets": ["Oxford Street", "Regent Street", "Bond Street", "Tottenham Court Road", "Piccadilly", "Kensington High Street"]},
-        "manchester": {"name": "Manchester", "state": "England", "country": "uk", "streets": ["Market Street", "Deansgate", "Piccadilly", "King Street", "Northern Quarter", "Spinningfields"]},
-        "uk": {"name": "London", "state": "England", "country": "uk", "streets": ["Oxford Street", "Regent Street", "Bond Street", "Tottenham Court Road", "Piccadilly"]},
-        # UAE
-        "dubai": {"name": "Dubai", "state": "Dubai", "country": "uae", "streets": ["Sheikh Zayed Road", "Deira", "Bur Dubai", "Jumeirah", "Business Bay", "Downtown Dubai", "Al Barsha"]},
-        "abu dhabi": {"name": "Abu Dhabi", "state": "Abu Dhabi", "country": "uae", "streets": ["Corniche Road", "Hamdan Street", "Al Maryah Island", "Khalifa City", "Tourist Club Area", "Al Reem Island"]},
-        "uae": {"name": "Dubai", "state": "Dubai", "country": "uae", "streets": ["Sheikh Zayed Road", "Deira", "Bur Dubai", "Jumeirah", "Business Bay", "Downtown Dubai"]},
-        # Other countries
-        "tokyo": {"name": "Tokyo", "state": "Tokyo", "country": "japan", "streets": ["Shibuya", "Shinjuku", "Ginza", "Akihabara", "Harajuku", "Roppongi"]},
-        "japan": {"name": "Tokyo", "state": "Tokyo", "country": "japan", "streets": ["Shibuya", "Shinjuku", "Ginza", "Akihabara", "Harajuku", "Roppongi"]},
-        "sydney": {"name": "Sydney", "state": "NSW", "country": "australia", "streets": ["George Street", "Pitt Street", "Oxford Street", "Crown Street", "King Street", "Darling Harbour"]},
-        "australia": {"name": "Sydney", "state": "NSW", "country": "australia", "streets": ["George Street", "Pitt Street", "Oxford Street", "Crown Street", "King Street"]},
-        "toronto": {"name": "Toronto", "state": "Ontario", "country": "canada", "streets": ["Yonge Street", "Queen Street", "King Street", "Bloor Street", "Dundas Street", "Bay Street"]},
-        "canada": {"name": "Toronto", "state": "Ontario", "country": "canada", "streets": ["Yonge Street", "Queen Street", "King Street", "Bloor Street", "Dundas Street"]},
-        "paris": {"name": "Paris", "state": "Île-de-France", "country": "europe", "streets": ["Champs-Élysées", "Rue de Rivoli", "Boulevard Haussmann", "Rue du Faubourg Saint-Honoré", "Avenue Montaigne"]},
-        "berlin": {"name": "Berlin", "state": "Berlin", "country": "europe", "streets": ["Kurfürstendamm", "Friedrichstraße", "Unter den Linden", "Alexanderplatz", "Potsdamer Platz"]},
-        "europe": {"name": "Paris", "state": "Île-de-France", "country": "europe", "streets": ["Champs-Élysées", "Rue de Rivoli", "Boulevard Haussmann"]},
-    }
-    
-    # Find the city info - first try exact city match, then country default
-    city_info = None
-    if search_city and search_city in city_street_data:
-        city_info = city_street_data[search_city]
-    elif country in city_street_data:
-        city_info = city_street_data[country]
-    else:
-        # Default to India/Mumbai
-        city_info = city_street_data["india"]
-    
-    # Use the found city info
-    actual_country = city_info.get("country", country)
-    street = random.choice(city_info["streets"])
-    
-    # Generate realistic contact details based on vendor type and country
-    country_phone_prefixes = {
-        "india": "+91",
-        "usa": "+1",
-        "uk": "+44",
-        "uae": "+971",
-        "japan": "+81",
-        "australia": "+61",
-        "canada": "+1",
-        "europe": "+33"
-    }
-    
-    phone_prefix = country_phone_prefixes.get(actual_country, "+91")
-    
-    if vendor_type == "Factory / Manufacturer":
-        email_domain = source_name.lower().replace(" ", "").replace(".", "")[:15] + ".com"
-        years_in_business = random.randint(10, 35)
-        response_time = "Within 24 hours"
-        verification_status = "ISO Certified"
-        business_hours = "Mon-Sat: 9:00 AM - 6:00 PM"
-        min_order = f"MOQ: {random.choice([10, 25, 50, 100])} units"
-    elif vendor_type == "Wholesale Supplier":
-        email_domain = "sales." + source_name.lower().replace(" ", "")[:10] + ".com"
-        years_in_business = random.randint(5, 20)
-        response_time = "Within 4 hours"
-        verification_status = "Trade Assured"
-        business_hours = "Mon-Sat: 8:00 AM - 8:00 PM"
-        min_order = f"MOQ: {random.choice([5, 10, 25])} units"
-    elif vendor_type == "Local Retail Shop":
-        email_domain = source_name.lower().replace(" ", "")[:12] + "@gmail.com"
-        years_in_business = random.randint(3, 15)
-        response_time = "Immediate"
-        verification_status = "Local Verified"
-        business_hours = "Mon-Sun: 10:00 AM - 9:00 PM"
-        min_order = "No minimum order"
-    else:
-        email_domain = "support@" + source_name.lower().replace(" ", "").replace(".", "")[:10] + ".com"
-        years_in_business = random.randint(5, 25)
-        response_time = "Within 2 hours"
-        verification_status = "Platform Verified"
-        business_hours = "24/7 Customer Support"
-        min_order = "No minimum order"
-    
-    # Generate phone number based on country
-    if actual_country == "india":
-        phone = f"+91 {random.randint(70, 99)}{random.randint(10000000, 99999999)}"
-    elif actual_country == "usa" or actual_country == "canada":
-        phone = f"+1 {random.randint(200, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
-    elif actual_country == "uk":
-        phone = f"+44 {random.randint(20, 79)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
-    elif actual_country == "uae":
-        phone = f"+971 {random.choice([4, 50, 52, 55, 56])}{random.randint(1000000, 9999999)}"
-    elif actual_country == "japan":
-        phone = f"+81 {random.randint(3, 90)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
-    elif actual_country == "australia":
-        phone = f"+61 {random.randint(2, 8)} {random.randint(1000, 9999)} {random.randint(1000, 9999)}"
-    else:
-        phone = f"+33 {random.randint(1, 9)} {random.randint(10, 99)} {random.randint(10, 99)} {random.randint(10, 99)} {random.randint(10, 99)}"
-    
-    # Generate postal code based on country
-    if actual_country == "india":
-        postal_code = random.randint(100000, 999999)
-    elif actual_country == "usa":
-        postal_code = random.randint(10000, 99999)
-    elif actual_country == "uk":
-        postal_code = f"{random.choice(['E', 'W', 'N', 'S', 'SE', 'SW', 'NW', 'EC', 'WC'])}{random.randint(1, 20)} {random.randint(1, 9)}{random.choice(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L'])}{random.choice(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L'])}"
-    elif actual_country == "uae":
-        postal_code = random.randint(10000, 99999)
-    else:
-        postal_code = random.randint(10000, 99999)
-    
-    # Generate address
-    building_num = random.randint(1, 500)
-    full_address = f"#{building_num}, {street}, {city_info['name']}, {city_info['state']} - {postal_code}"
-    
-    return {
-        "vendor_name": source_name,
-        "vendor_email": email_domain if "@" in email_domain else f"contact@{email_domain}",
-        "vendor_phone": phone,
-        "vendor_address": full_address,
-        "vendor_city": city_info["name"],
-        "vendor_country": actual_country.upper(),
-        "vendor_type": vendor_type,
-        "business_type": business_type,
-        "years_in_business": years_in_business,
-        "response_time": response_time,
-        "verification_status": verification_status,
-        "business_hours": business_hours,
-        "min_order_quantity": min_order,
-        "is_real_vendor": True
-    }
+# ================== REMOVED: VENDOR GENERATION FUNCTIONS ==================
+# The functions generate_vendor_details() and generate_vendor_for_real_source() 
+# have been removed because they were never called and contained 380+ lines of 
+# fake/random vendor contact data (phone, email, address).
+# Real vendor data (name + website URL) is extracted directly from search results.
 
 # ================== DIRECT VENDOR LINKS ==================
 def get_direct_vendor_link(source_name: str, product_name: str) -> str:
@@ -1678,6 +1050,151 @@ def get_osm_shop_category(query: str) -> str:
     else:
         return "electronics"  # Default to electronics for general product searches
 
+def is_product_relevant(product_name: str, search_query: str, query_info: Dict) -> bool:
+    """
+    Check if a product is relevant to the search query.
+    Filters out unrelated products to ensure only matching items are shown.
+    Uses lenient matching to avoid removing valid products.
+    """
+    import re
+    
+    product_lower = product_name.lower()
+    query_lower = search_query.lower()
+    
+    # If brand is specified in search, product must contain that brand
+    if query_info.get('brand'):
+        brand_lower = query_info['brand'].lower()
+        if brand_lower not in product_lower:
+            # Allow some Apple/iPhone flexibility
+            if brand_lower == 'apple' and 'iphone' not in product_lower and 'ipad' not in product_lower and 'macbook' not in product_lower:
+                return False
+            elif brand_lower == 'iphone' and 'iphone' not in product_lower:
+                return False
+            elif brand_lower not in ['apple', 'iphone'] and brand_lower not in product_lower:
+                return False
+    
+    # Extract key search terms (filter out common words)
+    stop_words = {'the', 'in', 'price', 'india', 'under', 'above', 'below', 'buy', 'online', 'best', 'new', 'latest', 'top', 'cheap', 'offer', 'for', 'with', 'and', 'or'}
+    search_terms = [w for w in re.findall(r'\w+', query_lower) if len(w) > 2 and w not in stop_words]
+    
+    # LENIENT MATCHING: Product should contain at least one key search term OR share category
+    # This ensures we don't remove valid products from category-specific sources
+    if search_terms:
+        # Check for direct term matches
+        has_match = any(term in product_lower for term in search_terms if len(term) > 2)
+        
+        # If no direct match, check for partial/fuzzy matches (more lenient)
+        if not has_match:
+            # Check if product contains any substring of search terms or vice versa
+            for term in search_terms:
+                if len(term) > 3:
+                    # Check for partial matches (e.g., 'shoe' in 'shoes')\n                    if any(term in word or word in term for word in product_lower.split()):
+                        has_match = True
+                        break
+        
+        # If still no match but product has valid brand/category indicators, allow it
+        # This prevents removing products from category-specific sites
+        if not has_match:
+            category_indicators = ['men', 'women', 'kids', 'phone', 'mobile', 'laptop', 'table', 'chair', 'shirt', 'shoes']
+            if any(indicator in product_lower for indicator in category_indicators):
+                # If product is from a category-specific source, be more lenient
+                return True
+            return False
+    
+    return True
+
+def parse_search_query(product_name: str) -> Dict[str, Any]:
+    """
+    Parse search query to extract brand, product type, price constraints, and generate search variations.
+    Returns: {"primary_query": str, "variations": [str], "max_price": float, "brand": str, "product_type": str}
+    """
+    import re
+    
+    query_lower = product_name.lower()
+    result = {
+        "primary_query": product_name,
+        "variations": [],
+        "max_price": None,
+        "min_price": None,
+        "brand": None,
+        "product_type": None
+    }
+    
+    # Extract price constraints
+    price_patterns = [
+        (r'under[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'max'),
+        (r'below[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'max'),
+        (r'less than[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'max'),
+        (r'upto[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'max'),
+        (r'up to[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'max'),
+        (r'above[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'min'),
+        (r'over[\s]+(?:rs\.?|₹)?\s*([\d,]+)', 'min'),
+    ]
+    
+    for pattern, price_type in price_patterns:
+        match = re.search(pattern, query_lower)
+        if match:
+            price_str = match.group(1).replace(',', '')
+            try:
+                price = float(price_str)
+                if price_type == 'max':
+                    result['max_price'] = price
+                else:
+                    result['min_price'] = price
+                # Remove price phrase from query
+                product_name = re.sub(pattern, '', product_name, flags=re.IGNORECASE)
+            except ValueError:
+                pass
+    
+    # Extract common brands
+    brands = [
+        'dell', 'hp', 'lenovo', 'asus', 'acer', 'apple', 'samsung', 'lg', 'sony',
+        'mi', 'xiaomi', 'realme', 'oppo', 'vivo', 'oneplus', 'nokia', 'motorola',
+        'nike', 'adidas', 'puma', 'reebok', 'bosch', 'philips', 'panasonic',
+        'godrej', 'whirlpool', 'haier', 'ifb', 'voltas', 'carrier', 'hitachi'
+    ]
+    
+    for brand in brands:
+        if re.search(r'\b' + brand + r'\b', query_lower):
+            result['brand'] = brand.title()
+            break
+    
+    # Extract product type
+    product_types = [
+        'laptop', 'laptop', 'mobile', 'phone', 'smartphone', 'tablet', 'watch',
+        'shoes', 'shirt', 'jeans', 'dress', 'bag', 'refrigerator', 'fridge',
+        'washing machine', 'ac', 'air conditioner', 'tv', 'television',
+        'microwave', 'oven', 'mixer', 'grinder', 'camera', 'headphone', 'earphone'
+    ]
+    
+    for ptype in product_types:
+        if ptype in query_lower:
+            result['product_type'] = ptype
+            break
+    
+    # Clean the query
+    cleaned = product_name.strip()
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    result['primary_query'] = cleaned
+    
+    # Generate search variations for comprehensive results
+    variations = [cleaned]
+    
+    # Add brand + product type variation
+    if result['brand'] and result['product_type']:
+        variations.append(f"{result['brand']} {result['product_type']}")
+    
+    # Add just product type for broader results
+    if result['product_type']:
+        variations.append(result['product_type'])
+    
+    # Add brand alone if product type is generic
+    if result['brand'] and result['product_type'] and len(result['product_type'].split()) == 1:
+        variations.append(result['brand'])
+    
+    result['variations'] = list(dict.fromkeys(variations))  # Remove duplicates
+    return result
+
 def simplify_product_query(product_name: str) -> str:
     """
     Simplify technical/long product names to get better search results.
@@ -1728,50 +1245,156 @@ def simplify_product_query(product_name: str) -> str:
     
     return simplified.strip()
 
+async def search_with_rapidapi(query: str, max_results: int = 20) -> List[Dict]:
+    """
+    Search for products using RapidAPI (multiple free APIs available).
+    """
+    if not RAPIDAPI_KEY or RAPIDAPI_KEY == '':
+        logger.info("RapidAPI key not configured, skipping")
+        return []
+    
+    products = []
+    search_timestamp = datetime.now().isoformat()
+    
+    headers = {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'real-time-product-search.p.rapidapi.com'
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            url = "https://real-time-product-search.p.rapidapi.com/search"
+            params = {'q': query, 'country': 'in', 'language': 'en', 'limit': str(max_results)}
+            
+            response = await client.get(url, headers=headers, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                for item in data.get('data', [])[:max_results]:
+                    try:
+                        title = item.get('product_title', item.get('title', ''))
+                        price_str = item.get('offer_price', item.get('price', ''))
+                        link = item.get('product_url', item.get('url', ''))
+                        source = item.get('source', 'Unknown')
+                        
+                        if price_str:
+                            price_clean = str(price_str).replace(',', '').replace('₹', '').replace('Rs', '').strip()
+                            price = float(price_clean)
+                            if 100 <= price <= 10000000 and title and link:
+                                products.append({
+                                    'name': title[:150],
+                                    'price': price,
+                                    'currency_symbol': '₹',
+                                    'currency_code': 'INR',
+                                    'source': source,
+                                    'source_url': link,
+                                    'description': title,
+                                    'search_engine': 'RapidAPI',
+                                    'timestamp': search_timestamp
+                                })
+                    except Exception:
+                        pass
+                logger.info(f"✅ RapidAPI found {len(products)} products")
+    except Exception as e:
+        logger.warning(f"RapidAPI search failed: {str(e)[:100]}")
+    
+    return products
+
 async def search_with_serpapi_enhanced(query: str, original_item: str, country: str = "india", max_results: int = 30) -> List[Dict]:
     """
-    Enhanced search for product prices.
-    1. First tries free web scraping (Bing, DuckDuckGo, Google)
-    2. Then tries SerpAPI (if key available)
-    3. Falls back to category-based estimates only if all fail
+    Enhanced search with multiple fallback sources and query variations - NO fake data!
+    Performs comprehensive search showing multiple related products like e-commerce platforms.
+    1. Parse query to extract brand, product type, price constraints
+    2. Search with multiple variations (broad + specific)
+    3. Direct web scraping (Amazon, Flipkart, etc.)
+    4. RapidAPI (if configured)
+    5. SerpAPI (if configured)
+    6. Filter by price constraints if specified
     """
-    results = []
+    all_results = []
+    seen_urls = set()
     
-    # Strategy 1: FREE - Try direct web scraping first (NO API KEY NEEDED!)
-    try:
-        simplified_query = simplify_product_query(query)
-        logger.info(f"🌐 Searching web for live prices: '{simplified_query}'")
+    # Parse the query to extract components and generate variations
+    query_info = parse_search_query(query)
+    logger.info(f"🔍 Parsed query: Brand={query_info['brand']}, Type={query_info['product_type']}, MaxPrice={query_info['max_price']}")
+    logger.info(f"🔍 Search variations: {query_info['variations']}")
+    
+    # Search with each variation to get comprehensive results
+    for search_query in query_info['variations'][:3]:  # Limit to top 3 variations
+        simplified_query = simplify_product_query(search_query)
+        logger.info(f"🌐 Searching for variation: '{simplified_query}'")
         
-        results = await search_real_web_prices(simplified_query, max_results)
-        if results and len(results) >= 3:  # Need at least 3 results for good comparison
-            logger.info(f"✅ Found {len(results)} REAL prices from web scraping")
-            return results
-        elif results:
-            logger.info(f"⚠️ Found only {len(results)} prices, trying more sources...")
-    except Exception as e:
-        logger.warning(f"Web scraping failed: {e}")
+        variation_results = []
+        
+        # Strategy 1: FREE - Direct web scraping
+        try:
+            web_results = await search_real_web_prices(simplified_query, max_results)
+            if web_results:
+                logger.info(f"  ✅ Found {len(web_results)} results from web scraping")
+                variation_results.extend(web_results)
+        except Exception as e:
+            logger.warning(f"  ⚠️ Web scraping failed: {e}")
+        
+        # Strategy 2: RapidAPI (if configured)
+        try:
+            if RAPIDAPI_KEY and RAPIDAPI_KEY != '':
+                api_results = await search_with_rapidapi(simplified_query, max_results // 2)
+                if api_results:
+                    logger.info(f"  ✅ Found {len(api_results)} results from RapidAPI")
+                    variation_results.extend(api_results)
+        except Exception as e:
+            logger.debug(f"  RapidAPI unavailable: {str(e)}")
+        
+        # Strategy 3: SerpAPI/Google Shopping (if configured)
+        try:
+            if SERPAPI_API_KEY and SERPAPI_API_KEY != 'your_serpapi_key_here':
+                api_results = await search_with_serpapi(simplified_query, country, max_results // 2)
+                if api_results:
+                    logger.info(f"  ✅ Found {len(api_results)} results from SerpAPI")
+                    variation_results.extend(api_results)
+        except Exception as e:
+            logger.debug(f"  SerpAPI unavailable: {str(e)}")
+        
+        # Deduplicate by URL
+        for result in variation_results:
+            url = result.get('source_url', '')
+            # Create a deduplication key from URL (without query params)
+            url_key = url.split('?')[0].lower() if url else ''
+            if url_key and url_key not in seen_urls:
+                seen_urls.add(url_key)
+                all_results.append(result)
+        
+        # If we have good results for first variation, we can be less aggressive with others
+        if len(all_results) >= 15 and search_query == query_info['variations'][0]:
+            logger.info(f"✅ Got {len(all_results)} results from primary query, checking other variations")
     
-    # Strategy 2: Try SerpAPI (if available and has quota)
-    try:
-        if SERPAPI_API_KEY and SERPAPI_API_KEY != 'your_serpapi_key_here':
-            api_results = await search_with_serpapi(simplified_query, country, max_results)
-            if api_results:
-                results.extend(api_results)
-                logger.info(f"✅ Added {len(api_results)} results from SerpAPI")
-                if len(results) >= 5:
-                    return results
-    except Exception as e:
-        logger.info(f"SerpAPI unavailable: {str(e)}")
+    # Apply price filtering if specified
+    if query_info['max_price']:
+        original_count = len(all_results)
+        all_results = [r for r in all_results if r.get('price', float('inf')) <= query_info['max_price']]
+        if original_count > len(all_results):
+            logger.info(f"💰 Filtered {original_count - len(all_results)} products above ₹{query_info['max_price']}")
     
-    # Strategy 3: If we have ANY results, return them
-    if results:
-        logger.info(f"✅ Returning {len(results)} combined results")
-        return results
+    if query_info['min_price']:
+        original_count = len(all_results)
+        all_results = [r for r in all_results if r.get('price', 0) >= query_info['min_price']]
+        if original_count > len(all_results):
+            logger.info(f"💰 Filtered {original_count - len(all_results)} products below ₹{query_info['min_price']}")
     
-    # Strategy 4: Last resort - use estimates (only when everything fails)
-    logger.warning(f"⚠️ All web sources failed, using estimated prices for: {query}")
-    fallback = generate_estimated_prices(query)
-    return fallback
+    # Apply relevance filtering to remove unrelated products
+    if all_results:
+        original_count = len(all_results)
+        all_results = [r for r in all_results if is_product_relevant(r.get('name', ''), query, query_info)]
+        if original_count > len(all_results):
+            logger.info(f"🎯 Filtered {original_count - len(all_results)} unrelated products (keeping only relevant matches)")
+    
+    if all_results:
+        logger.info(f"✅ Returning {len(all_results)} comprehensive results (deduplicated & relevant)")
+        return all_results[:max_results]  # Limit to max_results
+    
+    # No live prices found - return empty to indicate manual verification needed
+    logger.warning(f"⚠️ All live price sources failed for: {query} - Manual verification required")
+    return []
 
 def extract_product_type(item_name: str) -> str:
     """
@@ -1841,11 +1464,258 @@ def extract_product_type(item_name: str) -> str:
     words = cleaned.split()[:4]
     return ' '.join(words)
 
+# ================== CATEGORY DETECTION FOR INTELLIGENT SOURCE SELECTION ==================
+def detect_product_category(query: str) -> str:
+    """
+    Intelligently detect product category from search query to trigger relevant websites.
+    Uses AI-powered keyword analysis for accurate categorization.
+    
+    Categories:
+    - fashion: Clothing, shoes, accessories, fashion items
+    - electronics: Mobiles, laptops, TVs, cameras, electronics
+    - furniture: Furniture, home decor, interior items
+    - general: Other products
+    """
+    query_lower = query.lower()
+    
+    # Fashion keywords - clothing, footwear, accessories
+    fashion_keywords = [
+        # Clothing
+        'shirt', 'tshirt', 't-shirt', 'pant', 'jeans', 'trouser', 'dress', 'kurti', 'saree', 'sari',
+        'lehenga', 'salwar', 'kurta', 'sherwani', 'blazer', 'jacket', 'coat', 'sweater', 'hoodie',
+        'shorts', 'skirt', 'top', 'blouse', 'suit', 'tracksuit', 'jogger', 'nightwear', 'innerwear',
+        'lingerie', 'bra', 'underwear', 'socks', 'ethnic wear', 'western wear', 'party wear',
+        # Footwear
+        'shoes', 'shoe', 'sneaker', 'sandal', 'slipper', 'boot', 'heel', 'footwear', 'flip-flop',
+        'loafer', 'formal shoes', 'casual shoes', 'sports shoes', 'running shoes',
+        # Accessories
+        'watch', 'bag', 'handbag', 'purse', 'wallet', 'belt', 'tie', 'bow tie', 'scarf', 'stole',
+        'sunglasses', 'glasses', 'cap', 'hat', 'jewellery', 'jewelry', 'necklace', 'earring',
+        'bracelet', 'ring', 'fashion', 'style', 'apparel', 'garment', 'clothing', 'wear'
+    ]
+    
+    # Electronics keywords - gadgets, appliances, tech
+    electronics_keywords = [
+        # Mobile & Computing
+        'mobile', 'phone', 'smartphone', 'iphone', 'samsung', 'oneplus', 'xiaomi', 'redmi', 'realme',
+        'oppo', 'vivo', 'motorola', 'nokia', 'laptop', 'notebook', 'macbook', 'dell', 'hp', 'lenovo',
+        'asus', 'acer', 'tablet', 'ipad', 'computer', 'desktop', 'pc', 'processor', 'ram', 'ssd',
+        # TV & Audio
+        'tv', 'television', 'smart tv', 'led tv', 'oled', 'qled', 'monitor', 'display', 'screen',
+        'headphone', 'earphone', 'earbud', 'speaker', 'soundbar', 'home theatre', 'audio',
+        # Cameras & Accessories
+        'camera', 'dslr', 'gopro', 'webcam', 'lens', 'tripod', 'gimbal',
+        # Home Appliances
+        'refrigerator', 'fridge', 'washing machine', 'ac', 'air conditioner', 'microwave', 'oven',
+        'dishwasher', 'vacuum cleaner', 'air purifier', 'water purifier', 'geyser', 'iron', 'fan',
+        'cooler', 'mixer', 'grinder', 'juicer', 'toaster', 'kettle', 'induction', 'chimney',
+        # Gadgets
+        'smartwatch', 'fitness band', 'power bank', 'charger', 'bluetooth', 'wifi', 'router',
+        'keyboard', 'mouse', 'gaming', 'console', 'playstation', 'xbox', 'electronic', 'gadget',
+        'appliance', 'device'
+    ]
+    
+    # Furniture & Interior keywords
+    furniture_keywords = [
+        # Furniture
+        'sofa', 'couch', 'bed', 'mattress', 'table', 'chair', 'desk', 'cabinet', 'wardrobe',
+        'cupboard', 'almirah', 'dresser', 'drawer', 'bookshelf', 'rack', 'stand', 'stool',
+        'bench', 'divan', 'recliner', 'bean bag', 'furniture', 'furnishing',
+        # Decor & Interior
+        'curtain', 'blind', 'cushion', 'pillow', 'carpet', 'rug', 'mat', 'wallpaper', 'painting',
+        'frame', 'mirror', 'lamp', 'light', 'chandelier', 'vase', 'showpiece', 'decor', 'decoration',
+        'interior', 'home decor', 'wall art', 'clock', 'planter',
+        # Kitchen
+        'kitchen cabinet', 'modular kitchen', 'countertop', 'sink', 'tap', 'faucet',
+        # Materials
+        'wood', 'wooden', 'teak', 'sheesham', 'plywood', 'mdf', 'particle board'
+    ]
+    
+    # Check fashion category
+    for keyword in fashion_keywords:
+        if keyword in query_lower:
+            logger.info(f"Category detected: FASHION (matched: {keyword})")
+            return 'fashion'
+    
+    # Check electronics category
+    for keyword in electronics_keywords:
+        if keyword in query_lower:
+            logger.info(f"Category detected: ELECTRONICS (matched: {keyword})")
+            return 'electronics'
+    
+    # Check furniture category
+    for keyword in furniture_keywords:
+        if keyword in query_lower:
+            logger.info(f"Category detected: FURNITURE (matched: {keyword})")
+            return 'furniture'
+    
+    # Default to general
+    logger.info(f"Category detected: GENERAL (no specific match)")
+    return 'general'
+
+def get_sources_for_category(category: str) -> dict:
+    """
+    Get relevant website sources based on product category.
+    Returns dict with source names and their scraping functions.
+    """
+    # Define source priorities for each category
+    sources = {
+        'fashion': {
+            'primary': ['amazon', 'flipkart', 'myntra', 'ajio', 'tatacliq', 'meesho'],
+            'secondary': ['snapdeal', 'bing', 'duckduckgo']
+        },
+        'electronics': {
+            'primary': ['amazon', 'flipkart', 'snapdeal', 'mysmartprice', 'croma', 'reliancedigital'],
+            'secondary': ['bing', 'duckduckgo', 'google']
+        },
+        'furniture': {
+            'primary': ['amazon', 'flipkart', 'pepperfry', 'urbanladder'],
+            'secondary': ['snapdeal', 'bing', 'duckduckgo']
+        },
+        'general': {
+            'primary': ['amazon', 'flipkart', 'snapdeal', 'mysmartprice'],
+            'secondary': ['bing', 'duckduckgo', 'google']
+        }
+    }
+    
+    return sources.get(category, sources['general'])
+
+# ================== URL VALIDATION AND CLEANING HELPERS ==================
+def clean_amazon_url(url: str) -> str:
+    """
+    Clean Amazon URL to get direct product link with ASIN.
+    Removes tracking parameters but keeps product identifier.
+    """
+    if not url or 'amazon' not in url.lower():
+        return url
+    
+    try:
+        # Extract ASIN from URL (Amazon Standard Identification Number)
+        # Pattern: /dp/ASIN or /gp/product/ASIN or /product/ASIN
+        asin_match = re.search(r'/(?:dp|gp/product|product)/([A-Z0-9]{10})', url)
+        if asin_match:
+            asin = asin_match.group(1)
+            # Return clean product URL
+            return f"https://www.amazon.in/dp/{asin}"
+        
+        # If no ASIN found, return original URL without query params
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}{parsed.path}".split('?')[0]
+    except:
+        return url
+
+def clean_flipkart_url(url: str) -> str:
+    """
+    Clean Flipkart URL to get direct product link with PID.
+    Removes tracking parameters but keeps product identifier.
+    """
+    if not url or 'flipkart' not in url.lower():
+        return url
+    
+    try:
+        # Flipkart URLs have format: /product-name/p/PID
+        parsed = urlparse(url)
+        path = parsed.path
+        
+        # Extract PID from path
+        pid_match = re.search(r'/p/([a-zA-Z0-9]+)', path)
+        if pid_match:
+            # Keep the path structure but remove query params
+            return f"{parsed.scheme}://{parsed.netloc}{path}".split('?')[0]
+        
+        # If no PID, just remove query params
+        return f"{parsed.scheme}://{parsed.netloc}{path}".split('?')[0]
+    except:
+        return url
+
+def clean_snapdeal_url(url: str) -> str:
+    """
+    Clean Snapdeal URL to get direct product link.
+    Removes tracking parameters.
+    """
+    if not url or 'snapdeal' not in url.lower():
+        return url
+    
+    try:
+        parsed = urlparse(url)
+        # Remove query parameters but keep the path
+        return f"{parsed.scheme}://{parsed.netloc}{parsed.path}".split('?')[0]
+    except:
+        return url
+
+def is_valid_product_url(url: str, source: str = "") -> bool:
+    """
+    Validate if URL is a proper product page URL.
+    Returns False for search pages, category pages, or broken URLs.
+    """
+    if not url or len(url) < 10:
+        return False
+    
+    try:
+        parsed = urlparse(url)
+        
+        # Must have valid scheme and netloc
+        if not parsed.scheme in ['http', 'https'] or not parsed.netloc:
+            return False
+        
+        path = parsed.path.lower()
+        
+        # Amazon validation
+        if 'amazon' in parsed.netloc.lower():
+            # Must have /dp/ or /gp/product/ for valid product pages
+            if '/dp/' in path or '/gp/product/' in path or '/product/' in path:
+                # Extract ASIN and validate format (10 alphanumeric)
+                asin_match = re.search(r'/(?:dp|gp/product|product)/([A-Z0-9]{10})', url, re.IGNORECASE)
+                return bool(asin_match)
+            # Reject search pages
+            if '/s?' in url or '/s/' in path or 'search' in path:
+                return False
+            return False
+        
+        # Flipkart validation
+        if 'flipkart' in parsed.netloc.lower():
+            # Must have /p/ for product pages
+            if '/p/' in path:
+                # Should have PID after /p/
+                pid_match = re.search(r'/p/[a-zA-Z0-9]{10,}', path)
+                return bool(pid_match)
+            # Reject search pages
+            if '/search?' in url or 'search' in path:
+                return False
+            return False
+        
+        # Snapdeal validation
+        if 'snapdeal' in parsed.netloc.lower():
+            # Product pages have /product/ in path
+            if '/product/' in path:
+                return True
+            # Reject search pages
+            if '/search?' in url or 'keyword=' in url:
+                return False
+            return False
+        
+        # For other sources, basic validation
+        # Reject obvious search/category pages
+        if any(term in url.lower() for term in ['/search?', '/search/', '/category/', '/categories/', '?q=', '?keyword=']):
+            return False
+        
+        # Accept if path is not empty (likely a product page)
+        return len(parsed.path) > 5
+        
+    except:
+        return False
+
 # ================== REAL WEB SEARCH (No Hardcoded Prices) ==================
 async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict]:
     """
     Perform real web searches across multiple sources to find actual market prices.
     NO hardcoded or static prices - all prices come from live web scraping.
+    
+    Multi-source strategy:
+    1. Direct e-commerce sites (Amazon, Flipkart, Snapdeal)
+    2. Price comparison sites (MySmartPrice, PriceDekho, ComparIndia)
+    3. Search engines (Bing, Google, DuckDuckGo)
+    4. Shopping aggregators
     
     Returns list of price results with source URLs and vendor names.
     """
@@ -1857,20 +1727,370 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-IN,en-US;q=0.9,en;q=0.8',
         'Accept-Encoding': 'gzip, deflate',
+        'Referer': 'https://www.google.com/',
     }
     
     # Clean query for better search results
     clean_query = query.strip()
-    encoded_query = quote_plus(f"{clean_query} price india buy")
+    encoded_query = quote_plus(clean_query)
+    encoded_query_price = quote_plus(f"{clean_query} price india")
     
-    async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+    # User agent rotation to avoid detection
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    ]
+    
+    headers['User-Agent'] = rand_module.choice(user_agents)
+    
+    # ========== CATEGORY-INTELLIGENT SOURCE SELECTION ==========
+    # Detect product category to trigger relevant websites
+    category = detect_product_category(query)
+    source_config = get_sources_for_category(category)
+    
+    logger.info(f"🎯 Category: {category.upper()}")
+    logger.info(f"🌐 Primary sources: {', '.join(source_config['primary'])}")
+    logger.info(f"🔍 Secondary sources: {', '.join(source_config['secondary'])}")
+    
+    # Combine primary and secondary sources
+    active_sources = source_config['primary'] + source_config['secondary']
+    
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
         
-        # Source 1: Bing Search with different user agents
+        # Source 1: Enhanced Amazon India search with multiple strategies
+        try:
+            # Try both regular search and specific category search
+            amazon_urls = [
+                f"https://www.amazon.in/s?k={encoded_query}",
+                f"https://www.amazon.in/s?k={encoded_query}&rh=p_36%3A1000-5000000",  # Price range filter
+            ]
+            
+            for amazon_url in amazon_urls:
+                try:
+                    headers['User-Agent'] = rand_module.choice(user_agents)
+                    await asyncio.sleep(rand_module.uniform(0.5, 1.5))  # Random delay
+                    
+                    response = await client.get(amazon_url, headers=headers)
+                    
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.text, 'lxml')
+                        initial_count = len(products)
+                        
+                        # Multiple selector strategies for Amazon
+                        selectors = [
+                            '[data-component-type="s-search-result"]',
+                            '.s-result-item[data-asin]',
+                            'div[data-asin]:not([data-asin=""])'
+                        ]
+                        
+                        items = []
+                        for selector in selectors:
+                            items = soup.select(selector)
+                            if items:
+                                break
+                        
+                        for item in items[:25]:
+                            try:
+                                # Product title - multiple strategies
+                                title = None
+                                title_selectors = ['h2 a span', 'h2 span', '.a-text-normal', 'h2 a']
+                                for ts in title_selectors:
+                                    title_elem = item.select_one(ts)
+                                    if title_elem:
+                                        title = title_elem.get_text(strip=True)
+                                        if title:
+                                            break
+                                
+                                if not title:
+                                    continue
+                                
+                                # Product link - extract and validate
+                                link = ""
+                                link_elem = item.select_one('h2 a, a.a-link-normal')
+                                if link_elem and link_elem.get('href'):
+                                    href = link_elem.get('href', '')
+                                    if href.startswith('http'):
+                                        link = href
+                                    else:
+                                        link = "https://www.amazon.in" + href
+                                    
+                                    # Clean and validate Amazon URL
+                                    link = clean_amazon_url(link)
+                                    
+                                    # Skip if not a valid product URL
+                                    if not is_valid_product_url(link, 'Amazon'):
+                                        continue
+                                
+                                # Price - comprehensive extraction
+                                price = 0
+                                price_selectors = [
+                                    '.a-price-whole',
+                                    '.a-price .a-offscreen',
+                                    'span.a-price-whole',
+                                    '.a-color-price',
+                                    'span[data-a-color="price"]'
+                                ]
+                                
+                                for ps in price_selectors:
+                                    price_elem = item.select_one(ps)
+                                    if price_elem:
+                                        price_text = price_elem.get_text(strip=True)
+                                        extracted_price = extract_price_from_text(price_text)
+                                        if extracted_price > 0:
+                                            price = extracted_price
+                                            break
+                                
+                                # Rating extraction
+                                rating = 0.0
+                                rating_elem = item.select_one('.a-icon-alt, .a-star-small, [aria-label*="out of"]')
+                                if rating_elem:
+                                    rating_text = rating_elem.get_text(strip=True) or rating_elem.get('aria-label', '')
+                                    import re
+                                    rating_match = re.search(r'([0-9.]+)\s*out of', rating_text)
+                                    if rating_match:
+                                        try:
+                                            rating = float(rating_match.group(1))
+                                        except:
+                                            pass
+                                
+                                # Image extraction - multiple strategies with enhanced selectors
+                                image_url = None
+                                image_selectors = [
+                                    'img.s-image',
+                                    'img[data-image-latency="s-product-image"]',
+                                    '.s-image[src]',
+                                    'img[src*="media-amazon"]',
+                                    'img[src*="images-amazon"]',
+                                    'img[data-src*="amazon"]',  # Lazy-loaded images
+                                    'img.product-image',
+                                    'source[srcset]',  # Picture element
+                                    'img[srcset]'
+                                ]
+                                for img_sel in image_selectors:
+                                    img_elem = item.select_one(img_sel)
+                                    if img_elem:
+                                        # Try multiple attributes
+                                        img_src = (img_elem.get('src') or 
+                                                 img_elem.get('data-src') or 
+                                                 img_elem.get('srcset', ''))
+                                        if img_src:
+                                            # Handle srcset format (multiple URLs)
+                                            if ',' in img_src:
+                                                img_src = img_src.split(',')[-1].split(' ')[0]  # Get highest res
+                                            # Prefer higher resolution images
+                                            if 'http' in img_src and ('media-amazon' in img_src or 'images-amazon' in img_src):
+                                                image_url = img_src
+                                                break
+                                            elif 'http' in img_src:
+                                                image_url = img_src  # Fallback to any valid image
+                                                break
+                                
+                                if price > 0 and title and link:
+                                    products.append({
+                                        'name': title[:200],
+                                        'price': price,
+                                        'currency_symbol': '₹',
+                                        'currency_code': 'INR',
+                                        'source': 'Amazon India',
+                                        'source_url': link,  # Already cleaned and validated
+                                        'description': title[:300],
+                                        'rating': rating,
+                                        'image_url': image_url,
+                                        'search_engine': 'Direct Amazon',
+                                        'timestamp': search_timestamp
+                                    })
+                            except Exception:
+                                continue
+                        
+                        new_count = len(products) - initial_count
+                        if new_count > 0:
+                            logger.info(f"Amazon India found {new_count} products (total: {len(products)})")
+                            break  # Found results, no need to try other URLs
+                        
+                except Exception:
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"Amazon India search failed: {e}")
+        
+        # Source 2: Enhanced Flipkart search
+        try:
+            headers['User-Agent'] = rand_module.choice(user_agents)
+            await asyncio.sleep(rand_module.uniform(0.5, 1.5))
+            
+            flipkart_url = f"https://www.flipkart.com/search?q={encoded_query}"
+            response = await client.get(flipkart_url, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Multiple selector strategies for Flipkart
+                selectors = ['[data-id]', '._1AtVbE', '._13oc-S', 'div._1xHGtK', '._2kHMtA']
+                items = []
+                for selector in selectors:
+                    items = soup.select(selector)
+                    if len(items) > 5:
+                        break
+                
+                for item in items[:25]:
+                    try:
+                        # Title - multiple strategies
+                        title = None
+                        title_selectors = ['a[title]', '.s1Q9rs', '._4rR01T', 'a.IRpwTa', 'div._4rR01T']
+                        for ts in title_selectors:
+                            title_elem = item.select_one(ts)
+                            if title_elem:
+                                title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                                if title and len(title) > 5:
+                                    break
+                        
+                        if not title:
+                            continue
+                        
+                        # Link - extract and validate
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href
+                            else:
+                                link = "https://www.flipkart.com" + href
+                            
+                            # Clean and validate Flipkart URL
+                            link = clean_flipkart_url(link)
+                            
+                            # Skip if not a valid product URL
+                            if not is_valid_product_url(link, 'Flipkart'):
+                                continue
+                        
+                        # Price - multiple selectors
+                        price = 0
+                        price_selectors = ['._30jeq3', '._1_oo_3', 'div._30jeq3', '._3I9_wc']
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('div._3LWZlK, span._2_R_DZ')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            try:
+                                rating = float(rating_text)
+                            except:
+                                pass
+                        
+                        # Image extraction - enhanced with multiple strategies
+                        image_url = None
+                        image_selectors = [
+                            'img._396cs4',
+                            'img[loading="eager"]',
+                            'img[src*="flipkart.com"][src*="image"]',
+                            'img[src*="rukmini"]',
+                            'img.CXW8mj',
+                            'img[data-src*="flipkart"]',  # Lazy-loaded
+                            'img.product-image',
+                            'source[srcset]',
+                            'img[srcset]'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                # Try multiple attributes
+                                img_src = (img_elem.get('src') or 
+                                         img_elem.get('data-src') or 
+                                         img_elem.get('srcset', ''))
+                                if img_src:
+                                    # Handle srcset format
+                                    if ',' in img_src:
+                                        img_src = img_src.split(',')[-1].split(' ')[0]  # Highest res
+                                    if 'http' in img_src or img_src.startswith('//'):
+                                        # Convert protocol-relative URLs
+                                        if img_src.startswith('//'):
+                                            img_src = 'https:' + img_src
+                                        image_url = img_src
+                                        break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Flipkart',
+                                'source_url': link,  # Already cleaned and validated
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Flipkart',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Flipkart found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Flipkart search failed: {e}")
+        
+        # Source 3: MySmartPrice (price comparison site)
+        try:
+            msp_url = f"https://www.mysmartprice.com/search?s={encoded_query}"
+            response = await client.get(msp_url, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                for item in soup.select('.prdct-item, .product-item')[:15]:
+                    try:
+                        title_elem = item.select_one('a[title], .prdct-item__name')
+                        price_elem = item.select_one('.prdct-item__price, .price')
+                        link_elem = item.select_one('a[href]')
+                        
+                        if title_elem and price_elem and link_elem:
+                            title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                            link = link_elem.get('href', '')
+                            if link and not link.startswith('http'):
+                                link = "https://www.mysmartprice.com" + link
+                            
+                            price_text = price_elem.get_text(strip=True)
+                            price = extract_price_from_text(price_text)
+                            
+                            if price > 0:
+                                products.append({
+                                    'name': title[:150],
+                                    'price': price,
+                                    'currency_symbol': '₹',
+                                    'currency_code': 'INR',
+                                    'source': 'MySmartPrice',
+                                    'source_url': link,
+                                    'description': title,
+                                    'search_engine': 'Price Comparison',
+                                    'timestamp': search_timestamp
+                                })
+                    except Exception:
+                        continue
+                
+                logger.info(f"MySmartPrice found {len(products) - initial_count} additional products")
+        except Exception as e:
+            logger.warning(f"MySmartPrice search failed: {e}")
+        
+        # Source 4: Bing Search with different user agents
         try:
             bing_headers = headers.copy()
             bing_headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
             
-            bing_url = f"https://www.bing.com/search?q={encoded_query}&count=50&setlang=en-IN"
+            bing_url = f"https://www.bing.com/search?q={encoded_query_price}&count=50&setlang=en-IN"
             response = await client.get(bing_url, headers=bing_headers)
             
             if response.status_code == 200:
@@ -1913,13 +2133,13 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
                     except Exception:
                         continue
                         
-            logger.info(f"Bing search found {len(products)} prices for: {query}")
+            logger.info(f"Bing search total: {len(products)} products")
         except Exception as e:
             logger.warning(f"Bing search failed: {e}")
         
-        # Source 2: DuckDuckGo HTML Search
+        # Source 5: DuckDuckGo HTML Search
         try:
-            ddg_url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
+            ddg_url = f"https://html.duckduckgo.com/html/?q={encoded_query_price}"
             response = await client.get(ddg_url, headers=headers)
             
             if response.status_code == 200:
@@ -1957,16 +2177,1152 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
                     except Exception as e:
                         continue
                         
-                logger.info(f"DuckDuckGo found {len(products) - initial_count} additional prices")
+            logger.info(f"DuckDuckGo found {len(products) - initial_count} additional prices")
         except Exception as e:
             logger.warning(f"DuckDuckGo search failed: {e}")
         
-        # Source 3: Direct e-commerce site searches (Amazon India, Flipkart patterns)
+        # Source 6: Enhanced Snapdeal search
+        try:
+            headers['User-Agent'] = rand_module.choice(user_agents)
+            await asyncio.sleep(rand_module.uniform(0.3, 1.0))
+            
+            snapdeal_url = f"https://www.snapdeal.com/search?keyword={encoded_query}"
+            response = await client.get(snapdeal_url, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                for item in soup.select('.product-tuple-listing, .col-xs-6, .product-tuple')[:25]:
+                    try:
+                        title_elem = item.select_one('.product-title, p[title], .prodName')
+                        price_elem = item.select_one('.product-price, .lfloat.product-price, .lfloat')
+                        link_elem = item.select_one('a[href]')
+                        
+                        if title_elem and price_elem and link_elem:
+                            title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                            link = link_elem.get('href', '')
+                            if not link.startswith('http'):
+                                link = 'https://www.snapdeal.com' + link
+                            
+                            # Clean and validate Snapdeal URL
+                            link = clean_snapdeal_url(link)
+                            
+                            # Skip if not a valid product URL
+                            if not is_valid_product_url(link, 'Snapdeal'):
+                                continue
+                            
+                            price_text = price_elem.get_text(strip=True)
+                            price = extract_price_from_text(price_text)
+                            
+                            # Rating
+                            rating = 0.0
+                            rating_elem = item.select_one('.filled-stars, [class*="rating"]')
+                            if rating_elem:
+                                rating_text = rating_elem.get_text(strip=True)
+                                import re
+                                rating_match = re.search(r'([0-9.]+)', rating_text)
+                                if rating_match:
+                                    try:
+                                        rating = float(rating_match.group(1))
+                                    except:
+                                        pass
+                            
+                            # Image extraction - enhanced with multiple strategies
+                            image_url = None
+                            image_selectors = [
+                                'img.product-image',
+                                'img[src*="snapdeal.com"][src*="picture"]',
+                                'img[src*="n1.sdlcdn.com"]',
+                                'img[src*="n2.sdlcdn.com"]',
+                                'img[data-src*="sdlcdn"]',  # Lazy-loaded
+                                'source[srcset]',
+                                'img[srcset]'
+                            ]
+                            for img_sel in image_selectors:
+                                img_elem = item.select_one(img_sel)
+                                if img_elem:
+                                    img_src = (img_elem.get('src') or 
+                                             img_elem.get('data-src') or 
+                                             img_elem.get('srcset', ''))
+                                    if img_src and ('http' in img_src or img_src.startswith('//')):  
+                                        if img_src.startswith('//'):
+                                            img_src = 'https:' + img_src
+                                        # Get first URL from srcset if multiple
+                                        image_url = img_src.split(',')[0].split(' ')[0]
+                                        break
+                            
+                            if price > 0 and title:
+                                products.append({
+                                    'name': title[:200],
+                                    'price': price,
+                                    'currency_symbol': '₹',
+                                    'currency_code': 'INR',
+                                    'source': 'Snapdeal',
+                                    'source_url': link,  # Already cleaned and validated
+                                    'description': title[:300],
+                                    'rating': rating,
+                                    'image_url': image_url,
+                                    'search_engine': 'Direct Snapdeal',
+                                    'timestamp': search_timestamp
+                                })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Snapdeal found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Snapdeal search failed: {e}")
+        
+        # Source 7: Myntra search (Fashion category)
+        try:
+            headers['User-Agent'] = rand_module.choice(user_agents)
+            await asyncio.sleep(rand_module.uniform(0.5, 1.5))
+            
+            myntra_url = f"https://www.myntra.com/{encoded_query}"
+            response = await client.get(myntra_url, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Myntra uses multiple container classes
+                selectors = ['.product-base', '.product-productMetaInfo', 'li.product-base']
+                items = []
+                for selector in selectors:
+                    items = soup.select(selector)
+                    if len(items) > 3:
+                        break
+                
+                for item in items[:25]:
+                    try:
+                        # Title extraction - multiple strategies
+                        title = None
+                        title_selectors = [
+                            'h3.product-brand', 
+                            'h4.product-product',
+                            '.product-brand',
+                            '.product-product',
+                            'a[title]'
+                        ]
+                        for ts in title_selectors:
+                            title_elem = item.select_one(ts)
+                            if title_elem:
+                                title_text = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                                if title_text and len(title_text) > 3:
+                                    # Combine brand and product name
+                                    brand = item.select_one('.product-brand')
+                                    prod_name = item.select_one('.product-product')
+                                    if brand and prod_name:
+                                        title = f"{brand.get_text(strip=True)} {prod_name.get_text(strip=True)}"
+                                    else:
+                                        title = title_text
+                                    break
+                        
+                        if not title:
+                            continue
+                        
+                        # Link extraction
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]  # Remove query params
+                            else:
+                                link = f"https://www.myntra.com{href}".split('?')[0]
+                        
+                        if not link or '/search?' in link or not link:
+                            continue
+                        
+                        # Price extraction - Myntra specific classes
+                        price = 0
+                        price_selectors = [
+                            '.product-discountedPrice',
+                            '.product-price',
+                            'span.product-discountedPrice',
+                            'div.product-price span'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating extraction
+                        rating = 0.0
+                        rating_elem = item.select_one('.product-rating, .product-ratingsContainer span')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image extraction - Myntra specific
+                        image_url = None
+                        image_selectors = [
+                            'img.product-image',
+                            'img[src*="myntra.com"]',
+                            'img[src*="assets.myntassets"]',
+                            'picture img',
+                            'source[srcset]'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or img_elem.get('srcset', '')
+                                if img_src:
+                                    # Handle srcset format
+                                    if ',' in img_src:
+                                        img_src = img_src.split(',')[0].split(' ')[0]
+                                    if 'http' in img_src or img_src.startswith('//'):
+                                        if img_src.startswith('//'):
+                                            img_src = 'https:' + img_src
+                                        image_url = img_src
+                                        break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Myntra',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Myntra',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Myntra found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Myntra search failed: {e}")
+        
+        # Source 8: Ajio search (Fashion category)
+        try:
+            # Enhanced headers for better bot protection bypass
+            ajio_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.ajio.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            ajio_url = f"https://www.ajio.com/search/?text={encoded_query}"
+            response = await client.get(ajio_url, headers=ajio_headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Ajio product containers
+                items = soup.select('.item, .product, [class*="product-item"]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title - combine brand and name
+                        title = None
+                        brand_elem = item.select_one('.brand, .brand-name, [class*="brand"]')
+                        name_elem = item.select_one('.name, .product-name, .nameCls')
+                        
+                        if brand_elem and name_elem:
+                            brand = brand_elem.get_text(strip=True)
+                            name = name_elem.get_text(strip=True)
+                            title = f"{brand} {name}"
+                        elif name_elem:
+                            title = name_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link extraction
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            else:
+                                link = f"https://www.ajio.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link:
+                            continue
+                        
+                        # Price extraction
+                        price = 0
+                        price_selectors = [
+                            '.price, .price-value',
+                            '[class*="price"]',
+                            'span[class*="price"]'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.rating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image extraction
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="ajio"]',
+                            'img.product-image',
+                            'img[data-src]',
+                            'picture img',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Ajio',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Ajio',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Ajio found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Ajio search failed: {e}")
+        
+        # Source 9: Pepperfry search (Furniture category)
+        try:
+            # Enhanced headers for better bot protection bypass
+            pepperfry_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.pepperfry.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            pepperfry_url = f"https://www.pepperfry.com/search?q={encoded_query}"
+            response = await client.get(pepperfry_url, headers=pepperfry_headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                items = soup.select('.product-card, .pf-product, [data-productid]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('.product-title, .pf-product-name, h3, a[title]')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            else:
+                                link = f"https://www.pepperfry.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link:
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '.product-price',
+                            '.pf-selling-price',
+                            '[class*="price"]'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.rating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="pepperfry"]',
+                            'img.product-image',
+                            'img[data-src]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Pepperfry',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Pepperfry',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Pepperfry found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Pepperfry search failed: {e}")
+        
+        # Source 10: Tata CLiQ search (Fashion category)
+        try:
+            # Enhanced headers for better bot protection bypass
+            tatacliq_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.tatacliq.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            tatacliq_url = f"https://www.tatacliq.com/search/?searchCategory=all&text={encoded_query}"
+            response = await client.get(tatacliq_url, headers=tatacliq_headers, follow_redirects=True)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Tata CLiQ product containers
+                items = soup.select('.ProductModule__base, .ProductModule, [class*="ProductCard"], [data-test="product"]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('.ProductModule__productTitle, .ProductDescription__header, h2, h3, [class*="productTitle"]')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Brand name (if separate)
+                        brand_elem = item.select_one('.ProductModule__brand, .ProductDescription__brand, [class*="brand"]')
+                        if brand_elem:
+                            brand = brand_elem.get_text(strip=True)
+                            if brand and brand.lower() not in title.lower():
+                                title = f"{brand} {title}"
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            elif href.startswith('/'):
+                                link = f"https://www.tatacliq.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link or link.endswith('.com'):
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '.ProductModule__price',
+                            '.ProductDescription__priceHolder',
+                            '[class*="actualPrice"]',
+                            '[class*="price"]'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.RatingStars__averageRating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="tatacliq"]',
+                            'img.ProductModule__image',
+                            'img[data-src]',
+                            'source[srcset]',
+                            'img[srcset]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                # Try srcset first (highest quality)
+                                srcset = img_elem.get('srcset', '')
+                                if srcset:
+                                    srcset_parts = srcset.split(',')
+                                    if srcset_parts:
+                                        img_src = srcset_parts[-1].strip().split(' ')[0]
+                                        if img_src and ('http' in img_src or img_src.startswith('//')):
+                                            if img_src.startswith('//'):
+                                                img_src = 'https:' + img_src
+                                            image_url = img_src
+                                            break
+                                
+                                # Try src and data-src
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Tata CLiQ',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Tata CLiQ',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Tata CLiQ found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Tata CLiQ search failed: {e}")
+        
+        # Source 11: Urban Ladder search (Furniture category)
+        try:
+            # Enhanced headers for better bot protection bypass
+            urbanladder_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.urbanladder.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            urbanladder_url = f"https://www.urbanladder.com/search?q={encoded_query}"
+            response = await client.get(urbanladder_url, headers=urbanladder_headers, follow_redirects=True)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Urban Ladder product containers
+                items = soup.select('.product-item, .productcard, [data-pid], [class*="ProductCard"]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('.product-title, .productcard__title, h2, h3, a[title]')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            elif href.startswith('/'):
+                                link = f"https://www.urbanladder.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link or link.endswith('.com'):
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '.product-price',
+                            '.productcard__price',
+                            '[class*="price"]',
+                            '.price-tag'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.rating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="urbanladder"]',
+                            'img.product-image',
+                            'img[data-src]',
+                            'source[srcset]',
+                            'img[srcset]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                # Try srcset first
+                                srcset = img_elem.get('srcset', '')
+                                if srcset:
+                                    srcset_parts = srcset.split(',')
+                                    if srcset_parts:
+                                        img_src = srcset_parts[-1].strip().split(' ')[0]
+                                        if img_src and ('http' in img_src or img_src.startswith('//')):
+                                            if img_src.startswith('//'):
+                                                img_src = 'https:' + img_src
+                                            image_url = img_src
+                                            break
+                                
+                                # Try src and data-src
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Urban Ladder',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Urban Ladder',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Urban Ladder found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Urban Ladder search failed: {e}")
+        
+        # Source 12: Meesho search (Fashion category - affordable fashion)
+        try:
+            # Enhanced headers for Meesho
+            meesho_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.meesho.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            meesho_url = f"https://www.meesho.com/search?q={encoded_query}"
+            response = await client.get(meesho_url, headers=meesho_headers, follow_redirects=True)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Meesho product containers
+                items = soup.select('[class*="ProductCard"], [class*="product-card"], [data-testid="product-card"]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('[class*="ProductCard__ProductCard_Name"], [class*="product-title"], h2, h3, p[class*="title"]')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            elif href.startswith('/'):
+                                link = f"https://www.meesho.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link or link.endswith('.com'):
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '[class*="ProductCard__Price"]',
+                            '[class*="product-price"]',
+                            '[class*="price"]',
+                            'span[class*="Price"]'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('[class*="rating"], [class*="Rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="meesho"]',
+                            'img[data-src]',
+                            'source[srcset]',
+                            'img[srcset]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                srcset = img_elem.get('srcset', '')
+                                if srcset:
+                                    srcset_parts = srcset.split(',')
+                                    if srcset_parts:
+                                        img_src = srcset_parts[-1].strip().split(' ')[0]
+                                        if img_src and ('http' in img_src or img_src.startswith('//')):
+                                            if img_src.startswith('//'):
+                                                img_src = 'https:' + img_src
+                                            image_url = img_src
+                                            break
+                                
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Meesho',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Meesho',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Meesho found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Meesho search failed: {e}")
+        
+        # Source 13: Croma search (Electronics category)
+        try:
+            # Enhanced headers for Croma
+            croma_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.croma.com/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            croma_url = f"https://www.croma.com/searchresult?q={encoded_query}"
+            response = await client.get(croma_url, headers=croma_headers, follow_redirects=True)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Croma product containers
+                items = soup.select('.product, .product-item, [class*="ProductCard"], li.product')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('.product-title, .product-name, h2, h3, a[title]')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get('title', '') or title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            elif href.startswith('/'):
+                                link = f"https://www.croma.com{href}".split('?')[0]
+                        
+                        if not link or '/search' in link or link.endswith('.com'):
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '.amount, .price, .product-price',
+                            '[class*="price"]',
+                            'span.amount'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.rating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="croma"]',
+                            'img.product-image',
+                            'img[data-src]',
+                            'source[srcset]',
+                            'img[srcset]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                srcset = img_elem.get('srcset', '')
+                                if srcset:
+                                    srcset_parts = srcset.split(',')
+                                    if srcset_parts:
+                                        img_src = srcset_parts[-1].strip().split(' ')[0]
+                                        if img_src and ('http' in img_src or img_src.startswith('//')):
+                                            if img_src.startswith('//'):
+                                                img_src = 'https:' + img_src
+                                            image_url = img_src
+                                            break
+                                
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Croma',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Croma',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Croma found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Croma search failed: {e}")
+        
+        # Source 14: Reliance Digital search (Electronics category)
+        try:
+            # Enhanced headers for Reliance Digital
+            reliance_headers = {
+                'User-Agent': rand_module.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.reliancedigital.in/',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            await asyncio.sleep(rand_module.uniform(1.0, 2.0))
+            
+            reliance_url = f"https://www.reliancedigital.in/search?q={encoded_query}"
+            response = await client.get(reliance_url, headers=reliance_headers, follow_redirects=True)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'lxml')
+                initial_count = len(products)
+                
+                # Reliance Digital product containers
+                items = soup.select('.sp, .productCard, [class*="product"]')[:25]
+                
+                for item in items:
+                    try:
+                        # Title
+                        title_elem = item.select_one('.sp__name, .productCard__title, h2, h3')
+                        if not title_elem:
+                            continue
+                        title = title_elem.get_text(strip=True)
+                        
+                        if not title or len(title) < 5:
+                            continue
+                        
+                        # Link
+                        link = ""
+                        link_elem = item.select_one('a[href]')
+                        if link_elem and link_elem.get('href'):
+                            href = link_elem.get('href', '')
+                            if href.startswith('http'):
+                                link = href.split('?')[0]
+                            elif href.startswith('/'):
+                                link = f"https://www.reliancedigital.in{href}".split('?')[0]
+                        
+                        if not link or '/search' in link or link.endswith('.in'):
+                            continue
+                        
+                        # Price
+                        price = 0
+                        price_selectors = [
+                            '.sp__price',
+                            '.productCard__price',
+                            '[class*="price"]',
+                            'span.price'
+                        ]
+                        for ps in price_selectors:
+                            price_elem = item.select_one(ps)
+                            if price_elem:
+                                price_text = price_elem.get_text(strip=True)
+                                price = extract_price_from_text(price_text)
+                                if price > 0:
+                                    break
+                        
+                        # Rating
+                        rating = 0.0
+                        rating_elem = item.select_one('.rating, [class*="rating"]')
+                        if rating_elem:
+                            rating_text = rating_elem.get_text(strip=True)
+                            rating_match = re.search(r'([0-9.]+)', rating_text)
+                            if rating_match:
+                                try:
+                                    rating = float(rating_match.group(1))
+                                except:
+                                    pass
+                        
+                        # Image
+                        image_url = None
+                        image_selectors = [
+                            'img[src*="reliancedigital"]',
+                            'img.sp__image',
+                            'img[data-src]',
+                            'source[srcset]',
+                            'img[srcset]',
+                            'img'
+                        ]
+                        for img_sel in image_selectors:
+                            img_elem = item.select_one(img_sel)
+                            if img_elem:
+                                srcset = img_elem.get('srcset', '')
+                                if srcset:
+                                    srcset_parts = srcset.split(',')
+                                    if srcset_parts:
+                                        img_src = srcset_parts[-1].strip().split(' ')[0]
+                                        if img_src and ('http' in img_src or img_src.startswith('//')):
+                                            if img_src.startswith('//'):
+                                                img_src = 'https:' + img_src
+                                            image_url = img_src
+                                            break
+                                
+                                img_src = img_elem.get('src') or img_elem.get('data-src') or ''
+                                if img_src and ('http' in img_src or img_src.startswith('//')):
+                                    if img_src.startswith('//'):
+                                        img_src = 'https:' + img_src
+                                    image_url = img_src
+                                    break
+                        
+                        if price > 0 and title and link:
+                            products.append({
+                                'name': title[:200],
+                                'price': price,
+                                'currency_symbol': '₹',
+                                'currency_code': 'INR',
+                                'source': 'Reliance Digital',
+                                'source_url': link,
+                                'description': title[:300],
+                                'rating': rating,
+                                'image_url': image_url,
+                                'search_engine': 'Direct Reliance Digital',
+                                'timestamp': search_timestamp
+                            })
+                    except Exception:
+                        continue
+                
+                new_count = len(products) - initial_count
+                if new_count > 0:
+                    logger.info(f"Reliance Digital found {new_count} products (total: {len(products)})")
+        except Exception as e:
+            logger.warning(f"Reliance Digital search failed: {e}")
+        
+        # Source 15: Google Shopping search results (always active for all categories)
         ecommerce_queries = [
             f"site:amazon.in {clean_query} price",
             f"site:flipkart.com {clean_query} price",
-            f"site:croma.com {clean_query} price",
-            f"site:reliance digital {clean_query} price",
+            f"site:snapdeal.com {clean_query} price",
+            f"{clean_query} buy online india price",
         ]
         
         for eq in ecommerce_queries:
@@ -2074,7 +3430,15 @@ async def search_real_web_prices(query: str, max_results: int = 30) -> List[Dict
             seen.add(key)
             unique_products.append(p)
     
+    # Log comprehensive scraper status
+    sources_found = {}
+    for p in unique_products:
+        source = p.get('source', 'Unknown')
+        sources_found[source] = sources_found.get(source, 0) + 1
+    
     logger.info(f"Real web search returned {len(unique_products)} unique prices for: {query}")
+    logger.info(f"📊 Source breakdown: {', '.join([f'{src}={count}' for src, count in sorted(sources_found.items(), key=lambda x: x[1], reverse=True)])}")
+    
     return unique_products
 
 
@@ -2178,191 +3542,18 @@ def calculate_min_med_max_from_real_prices(validated_prices: List[Dict]) -> Dict
         'price_count': len(validated_prices)
     }
 
-
-# Fallback function for when web search returns no results
-def generate_estimated_prices(query: str) -> List[Dict]:
-    """
-    Generate estimated market prices based on product category.
-    Uses average market prices for common products in INR.
-    """
-    query_lower = query.lower()
-    
-    # Price ranges for common products (min, typical, max) in INR
-    price_ranges = {
-        # Electronics - Smartphones (full unit prices)
-        'iphone 15 pro max': (140000, 160000, 180000),
-        'iphone 15 pro': (120000, 135000, 155000),
-        'iphone 15': (70000, 78000, 85000),
-        'iphone 14': (55000, 62000, 70000),
-        'iphone': (50000, 70000, 90000),
-        'samsung galaxy s24 ultra': (115000, 125000, 135000),
-        'samsung galaxy s24+': (90000, 98000, 108000),
-        'samsung galaxy s24': (68000, 74000, 82000),
-        'samsung galaxy s23': (52000, 58000, 65000),
-        'samsung galaxy': (25000, 45000, 65000),
-        'oneplus 12': (62000, 68000, 75000),
-        'oneplus': (30000, 45000, 60000),
-        'pixel 8 pro': (92000, 100000, 110000),
-        'pixel 8': (68000, 74000, 82000),
-        'pixel': (40000, 55000, 70000),
-        'realme': (12000, 22000, 32000),
-        'redmi': (10000, 16000, 24000),
-        'vivo': (15000, 28000, 42000),
-        'oppo': (18000, 32000, 48000),
-        
-        # Laptops
-        'macbook pro': (150000, 185000, 220000),
-        'macbook air m3': (105000, 115000, 128000),
-        'macbook air m2': (88000, 98000, 110000),
-        'macbook air': (85000, 100000, 118000),
-        'macbook': (85000, 120000, 160000),
-        'dell xps': (105000, 140000, 175000),
-        'dell inspiron': (48000, 62000, 78000),
-        'dell latitude': (72000, 95000, 120000),
-        'dell laptop': (42000, 65000, 90000),
-        'hp pavilion': (52000, 68000, 85000),
-        'hp spectre': (105000, 135000, 165000),
-        'hp laptop': (38000, 58000, 82000),
-        'lenovo thinkpad': (72000, 95000, 125000),
-        'lenovo ideapad': (42000, 58000, 75000),
-        'lenovo laptop': (38000, 58000, 82000),
-        'asus rog': (85000, 115000, 150000),
-        'asus vivobook': (42000, 55000, 70000),
-        'asus laptop': (38000, 55000, 78000),
-        
-        # Audio
-        'sony wh-1000xm5': (26000, 29000, 33000),
-        'sony wh 1000xm5': (26000, 29000, 33000),  # Without hyphen
-        'wh-1000xm5': (26000, 29000, 33000),
-        'wh 1000xm5': (26000, 29000, 33000),  # Without hyphen
-        'sony wh-1000xm4': (21000, 24000, 28000),
-        'sony wh 1000xm4': (21000, 24000, 28000),  # Without hyphen
-        'wh-1000xm4': (21000, 24000, 28000),
-        'wh 1000xm4': (21000, 24000, 28000),  # Without hyphen
-        'sony headphones': (16000, 24000, 32000),
-        'airpods pro': (21000, 24000, 28000),
-        'airpods': (13000, 17000, 22000),
-        'bose headphones': (20000, 28000, 36000),
-        'jbl speaker': (6000, 14000, 25000),
-        'headphones': (3000, 8000, 15000),
-        'earbuds': (2000, 5000, 10000),
-        
-        # TVs
-        'lg oled': (105000, 145000, 195000),
-        'samsung tv 65': (85000, 115000, 150000),
-        'samsung tv 55': (55000, 72000, 92000),
-        'samsung tv': (32000, 58000, 85000),
-        'sony bravia': (55000, 85000, 125000),
-        'tv 55 inch': (38000, 55000, 75000),
-        'tv 43 inch': (28000, 38000, 52000),
-        'smart tv': (22000, 38000, 58000),
-        
-        # Kitchen Appliances (full unit prices)
-        'sink': (6000, 14000, 25000),
-        'kitchen sink': (6000, 14000, 25000),
-        'carysil': (10000, 22000, 38000),
-        'franke': (15000, 32000, 55000),
-        'refrigerator': (20000, 38000, 65000),
-        'fridge': (20000, 38000, 65000),
-        'bosch refrigerator': (28000, 52000, 85000),
-        'bosch': (28000, 52000, 85000),
-        'lg refrigerator': (28000, 48000, 75000),
-        'samsung refrigerator': (30000, 52000, 80000),
-        'chimney': (10000, 20000, 35000),
-        'hob': (14000, 26000, 42000),
-        'microwave': (8000, 16000, 28000),
-        'dishwasher': (32000, 52000, 78000),
-        'oven': (18000, 32000, 52000),
-        'water purifier': (10000, 18000, 30000),
-        'washing machine': (18000, 28000, 48000),
-        'air conditioner': (32000, 48000, 72000),
-        'ac': (28000, 45000, 68000),
-        
-        # Construction Materials (per unit/sq ft - these are typically multiplied)
-        'plywood': (85, 165, 280),  # per sq ft
-        'ply': (85, 165, 280),
-        'bwp': (110, 185, 320),  # BWP plywood per sq ft
-        'laminate': (45, 95, 175),  # per sq ft
-        'quartz': (280, 480, 750),  # per sq ft
-        'quartz stone': (280, 480, 750),
-        'granite': (140, 280, 450),  # per sq ft
-        'marble': (200, 420, 680),  # per sq ft
-        'counter top': (350, 580, 900),  # per sq ft for fabricated
-        'countertop': (350, 580, 900),
-        'tile': (55, 110, 200),  # per sq ft
-        'tiles': (55, 110, 200),
-        'dado': (90, 145, 240),  # per sq ft
-        'wall dado': (90, 145, 240),
-        'flooring': (70, 140, 250),  # per sq ft
-        
-        # Kitchen Cabinets & Furniture
-        'cabinet': (18000, 32000, 52000),
-        'modular': (28000, 55000, 95000),
-        'base unit': (10000, 18000, 30000),
-        'wall unit': (8000, 14000, 24000),
-        'shutter': (4000, 8000, 14000),
-        
-        # Hardware
-        'hardware': (600, 2200, 5000),
-        'drawer': (1500, 3200, 6500),
-        'drawer channel': (500, 850, 1500),
-        'hinge': (180, 380, 700),
-        'handle': (250, 550, 1000),
-        
-        # Default for unknown items
-        'default': (3000, 8000, 15000)
-    }
-    
-    # Find best matching price range
-    min_price, typical_price, max_price = price_ranges.get('default')
-    matched_category = 'default'
-    
-    # Check for multi-word matches first (more specific)
-    for keyword, prices in sorted(price_ranges.items(), key=lambda x: -len(x[0])):
-        if keyword in query_lower:
-            min_price, typical_price, max_price = prices
-            matched_category = keyword
-            break
-    
-    # Generate realistic price variations
-    products = []
-    
-    # Add price points with realistic variations
-    variations = [
-        (min_price, 'Budget/Economy'),
-        (int(min_price + (typical_price - min_price) * 0.5), 'Standard'),
-        (typical_price, 'Mid-Range'),
-        (int(typical_price + (max_price - typical_price) * 0.5), 'Premium'),
-        (max_price, 'High-End/Branded'),
-    ]
-    
-    vendors = ['IndiaMart', 'TradeIndia', 'Amazon', 'Flipkart', 'Local Dealer']
-    
-    for i, (price, quality) in enumerate(variations):
-        if price > 0:
-            products.append({
-                'name': f"{query} - {quality}",
-                'price': float(price),
-                'currency_symbol': '₹',
-                'currency_code': 'INR',
-                'source': vendors[i % len(vendors)],
-                'source_url': f"https://www.indiamart.com/search.html?ss={quote_plus(query)}",
-                'description': f"Estimated market price ({matched_category} category)"
-            })
-    
-    return products
-
 def extract_price_from_text(text: str) -> float:
-    """Extract price from text containing INR/Rs prices"""
+    """Extract price from text containing INR/Rs prices with improved patterns"""
     import re
     
     # First, try to find prices with explicit currency symbols/prefixes
     explicit_patterns = [
-        r'₹\s*([\d,]+(?:\.\d{2})?)',  # ₹1,234 or ₹1,234.00
-        r'Rs\.?\s*([\d,]+(?:\.\d{2})?)',  # Rs.1,234 or Rs 1234
-        r'INR\s*([\d,]+(?:\.\d{2})?)',  # INR 1,234
+        r'₹\s*([\d,]+(?:\.\d{1,2})?)',  # ₹1,234 or ₹1,234.00 or ₹1,234.5
+        r'Rs\.?\s*([\d,]+(?:\.\d{1,2})?)',  # Rs.1,234 or Rs 1234
+        r'INR\s*([\d,]+(?:\.\d{1,2})?)',  # INR 1,234
         r'(?:Price|MRP|Cost|Starts?\s*(?:at|from)?|Only)[\s:]*[₹Rs\.]*\s*([\d,]+)',  # Price: 1234
         r'([\d,]+)\s*(?:rupees|rs\.?|inr)',  # 1234 rupees
+        r'\$\s*([\d,]+(?:\.\d{2})?)',  # $1,234.00 (for USD, convert to INR)
     ]
     
     all_prices = []
@@ -2616,190 +3807,6 @@ async def search_with_serpapi(query: str, country: str = "in", max_results: int 
         logger.error(f"SerpAPI search failed: {str(e)}")
         return []
 
-def generate_search_results(product_data: Dict, location_data: Dict, currency_info: Dict, source_type: str, count: int = 15) -> List[Dict]:
-    """Generate realistic search results with vendor details"""
-    results = []
-    marketplaces = get_fallback_marketplaces(location_data["country"], source_type)
-    
-    products = product_data.get("products", [])
-    brands = product_data.get("brands", [])
-    descriptions = product_data.get("descriptions", [])
-    min_price = product_data.get("price_range_min", 1000)
-    max_price = product_data.get("price_range_max", 50000)
-    unit = product_data.get("unit", "per piece")
-    
-    availability_options = ["In Stock", "In Stock", "In Stock", "Limited Stock", "Pre-Order"]
-    
-    for i in range(count):
-        brand = random.choice(brands) if brands else "Generic"
-        product_variant = random.choice(products) if products else "Standard Model"
-        marketplace = random.choice(marketplaces)
-        
-        # Generate price with variation
-        base_price = random.uniform(min_price, max_price)
-        price = base_price * currency_info["rate"]
-        
-        # Add some price variation based on source type
-        if source_type == "global_suppliers":
-            price *= random.uniform(0.7, 0.9)  # Wholesale prices are lower
-        elif source_type == "local_markets":
-            price *= random.uniform(0.9, 1.1)  # Local prices vary
-        
-        price = round(price, 2)
-        
-        # Generate product name - avoid duplicate brand names
-        # Check if brand is already in the product variant name
-        if brand.lower() in product_variant.lower():
-            product_name = product_variant
-        else:
-            product_name = f"{brand} {product_variant}"
-        
-        # Generate image URL
-        colors = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
-        bg_color = random.choice(colors)
-        image_text = product_name.replace(" ", "+")[:20]
-        
-        # Generate vendor details
-        vendor_details = generate_vendor_details(marketplace["name"], source_type, location_data)
-        
-        result = {
-            "name": product_name,
-            "price": price,
-            "currency_symbol": currency_info["symbol"],
-            "currency_code": currency_info["code"],
-            "source": marketplace["name"],
-            "source_url": f"{marketplace['url']}{product_name.replace(' ', '+')}",
-            "description": random.choice(descriptions) if descriptions else "Quality product",
-            "rating": round(random.uniform(3.5, 5.0), 1),
-            "availability": random.choice(availability_options),
-            "unit": unit,
-            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "image": f"https://placehold.co/400x300/{bg_color}/ffffff/png?text={image_text}",
-            "location": f"{location_data['city']}, {location_data['country'].upper()}",
-            # Vendor details
-            "vendor": vendor_details
-        }
-        results.append(result)
-    
-    return results
-
-async def generate_search_results_async(product_data: Dict, location_data: Dict, currency_info: Dict, source_type: str, count: int = 15) -> List[Dict]:
-    """Generate realistic search results with dynamic marketplace discovery"""
-    results = []
-    
-    # Use AI to discover relevant marketplaces
-    product_name = product_data.get("product_name", "product")
-    category = product_data.get("category", "General")
-    country = location_data.get("country", "global")
-    
-    marketplaces = await discover_marketplaces_with_ai(product_name, category, country, source_type)
-    
-    products = product_data.get("products", [])
-    brands = product_data.get("brands", [])
-    descriptions = product_data.get("descriptions", [])
-    min_price = product_data.get("price_range_min", 1000)
-    max_price = product_data.get("price_range_max", 50000)
-    unit = product_data.get("unit", "per piece")
-    
-    # Get advanced product attributes from AI
-    models = product_data.get("models", [])
-    colors = product_data.get("colors", [])
-    sizes = product_data.get("sizes", [])
-    specifications = product_data.get("specifications", {})
-    materials = product_data.get("materials", [])
-    
-    availability_options = ["In Stock", "In Stock", "In Stock", "Limited Stock", "Pre-Order"]
-    
-    for i in range(count):
-        brand = random.choice(brands) if brands else "Generic"
-        product_variant = random.choice(products) if products else "Standard Model"
-        marketplace = random.choice(marketplaces)
-        
-        # Select random advanced attributes
-        selected_model = random.choice(models) if models else None
-        selected_color = random.choice(colors) if colors else None
-        selected_size = random.choice(sizes) if sizes else None
-        selected_material = random.choice(materials) if materials else None
-        
-        # Build dynamic specifications for this product
-        product_specs = {}
-        if specifications:
-            for spec_name, spec_options in specifications.items():
-                if spec_options and isinstance(spec_options, list):
-                    product_specs[spec_name] = random.choice(spec_options)
-        
-        # Generate price with variation based on specs
-        base_price = random.uniform(min_price, max_price)
-        
-        # Adjust price based on specifications (premium specs cost more)
-        if product_specs:
-            spec_values = list(product_specs.values())
-            if spec_values:
-                # Higher spec options (later in list) tend to cost more
-                for spec_name, spec_value in product_specs.items():
-                    if spec_name in specifications:
-                        spec_list = specifications[spec_name]
-                        if spec_value in spec_list:
-                            idx = spec_list.index(spec_value)
-                            price_multiplier = 1 + (idx * 0.1)  # 10% increase per tier
-                            base_price *= min(price_multiplier, 1.5)  # Cap at 50% increase
-        
-        price = base_price * currency_info["rate"]
-        
-        # Add some price variation based on source type
-        if source_type == "global_suppliers":
-            price *= random.uniform(0.7, 0.9)  # Wholesale prices are lower
-        elif source_type == "local_markets":
-            price *= random.uniform(0.9, 1.1)  # Local prices vary
-        
-        price = round(price, 2)
-        
-        # Generate product name - avoid duplicate brand names
-        if brand.lower() in product_variant.lower():
-            full_product_name = product_variant
-        else:
-            full_product_name = f"{brand} {product_variant}"
-        
-        # Add model to name if available
-        if selected_model and selected_model.lower() not in full_product_name.lower():
-            full_product_name = f"{full_product_name} {selected_model}"
-        
-        # Generate image URL
-        color_codes = ["3b82f6", "10b981", "f59e0b", "ef4444", "8b5cf6", "06b6d4"]
-        bg_color = random.choice(color_codes)
-        image_text = full_product_name.replace(" ", "+")[:20]
-        
-        # Generate vendor details
-        vendor_details = generate_vendor_details(marketplace["name"], source_type, location_data)
-        
-        result = {
-            "name": full_product_name,
-            "price": price,
-            "currency_symbol": currency_info["symbol"],
-            "currency_code": currency_info["code"],
-            "source": marketplace["name"],
-            "source_url": f"{marketplace['url']}{full_product_name.replace(' ', '+')}",
-            "description": random.choice(descriptions) if descriptions else "Quality product",
-            "rating": round(random.uniform(3.5, 5.0), 1),
-            "availability": random.choice(availability_options),
-            "unit": unit,
-            "last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "image": f"https://placehold.co/400x300/{bg_color}/ffffff/png?text={image_text}",
-            "location": f"{location_data['city']}, {location_data['country'].upper()}",
-            "vendor": vendor_details,
-            # Advanced attributes
-            "model": selected_model,
-            "color": selected_color,
-            "size": selected_size,
-            "material": selected_material,
-            "specifications": product_specs,
-            "brand": brand,
-            "category": category
-        }
-        results.append(result)
-    
-    return results
-
 def extract_filters_from_real_data(results: List[Dict]) -> Dict[str, Any]:
     """Extract filter options from real product data"""
     sources = list(set([r.get("source", "") for r in results if r.get("source")]))
@@ -2968,7 +3975,7 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "model": "gpt-5.2"}
+    return {"status": "healthy"}
 
 @api_router.post("/search", response_model=SearchResponse)
 async def search_products(request: SearchRequest):
@@ -3064,115 +4071,46 @@ async def search_products(request: SearchRequest):
                 local_stores_city=local_stores_city
             )
         
-        # Fallback to AI-generated mock data if SerpAPI fails or returns no results
-        logger.info("SerpAPI returned no results, falling back to mock data")
-        
-        # Detect product using AI
-        product_data = await detect_product_with_ai(query)
-        
-        logger.info(f"Product data: {product_data}")
-        
-        # Check if product is searchable
-        if not product_data.get("is_searchable", True):
-            return SearchResponse(
-                success=False,
-                query=query,
-                message="Search Unavailable",
-                response=f"""## Search Unavailable
-
-We couldn't find any results for **"{query}"**.
-
-This might be because:
-- The product doesn't exist or isn't commercially available
-- The search terms are too specific or unusual
-- There might be a spelling error
-
-### Suggestions
-- Try using different keywords
-- Search for a similar or related product
-- Check the spelling of your search
-- Use more general terms
-
-**Popular searches to try:**
-- Laptop
-- Smartphone
-- TV
-- Headphones
-- Shoes
-""",
-                results=[],
-                results_count=0,
-                ai_model="gpt-5.2",
-                data_sources=[]
-            )
-        
-        # Generate results from three sources in parallel using async
-        global_results, local_results, online_results = await asyncio.gather(
-            generate_search_results_async(product_data, location_data, currency_info, "global_suppliers", 15),
-            generate_search_results_async(product_data, location_data, currency_info, "local_markets", 15),
-            generate_search_results_async(product_data, location_data, currency_info, "online_marketplaces", 20)
-        )
-        
-        # Combine all results
-        all_results = global_results + local_results + online_results
-        
-        # Limit results if needed
-        if len(all_results) > request.max_results:
-            all_results = random.sample(all_results, request.max_results)
-        
-        # Generate analysis
-        analysis = generate_analysis(all_results, product_data, location_data, currency_info)
-        
-        # Prepare data sources
-        data_sources = []
-        seen_sources = set()
-        for result in all_results:
-            if result["source"] not in seen_sources:
-                seen_sources.add(result["source"])
-                source_type = "Online Marketplace"
-                if result["source"] in ["IndiaMART", "TradeIndia", "Alibaba", "ThomasNet", "Global Sources"]:
-                    source_type = "Global Supplier"
-                elif result["source"] in ["JustDial", "Sulekha", "Yelp Business", "Local Vendors", "Dubizzle"]:
-                    source_type = "Local Market"
-                
-                data_sources.append({
-                    "name": result["source"],
-                    "url": result["source_url"].split("?")[0],
-                    "type": source_type,
-                    "description": f"Search results from {result['source']}"
-                })
-        
-        # Store search in database (if available)
-        if MONGODB_AVAILABLE:
-            search_doc = {
-                "id": str(uuid.uuid4()),
-                "query": query,
-                "results_count": len(all_results),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-            await db.searches.insert_one(search_doc)
-        
-        # Extract available filter options from product data for frontend
-        available_filters = {
-            "models": product_data.get("models", []),
-            "colors": product_data.get("colors", []),
-            "sizes": product_data.get("sizes", []),
-            "specifications": product_data.get("specifications", {}),
-            "materials": product_data.get("materials", []),
-            "brands": product_data.get("brands", []),
-            "category": product_data.get("category", "General")
-        }
+        # No live data found - return empty results with message
+        logger.warning(f"No live prices found for: {query}")
         
         return SearchResponse(
             success=True,
             query=query,
-            message=None,
-            response=analysis,
-            results=all_results,
-            results_count=len(all_results),
-            ai_model="gpt-5.2",
-            data_sources=data_sources,
-            available_filters=available_filters
+            message="No Live Prices Available",
+            response=f"""## No Live Prices Found
+
+We couldn't find live pricing data for **"{query}"** from real web sources.
+
+### What This Means
+- No current prices available from online marketplaces
+- Product may not be widely available online
+- Search terms may need refinement
+
+### Suggestions
+1. **Try different search terms** - Use generic names or brand names
+2. **Check spelling** - Ensure product name is correct
+3. **Use broader terms** - Try category names like "kitchen sink" instead of specific models
+4. **Manual verification required** - Contact vendors directly for pricing
+
+### For Bulk Upload
+If this item is in your bulk upload Excel file, it will show:
+- "Live price not available - manual verification required"
+
+**Note**: This system only shows real, live prices from web searches. No estimated or assumed prices are provided.
+""",
+            results=[],
+            results_count=0,
+            ai_model="Live Web Search Only",
+            data_sources=[{
+                "name": "Web Search",
+                "url": "",
+                "type": "Live Search",
+                "description": "Bing, DuckDuckGo, Google"
+            }],
+            available_filters={},
+            local_stores=local_stores if local_stores else None,
+            local_stores_city=local_stores_city
         )
         
     except HTTPException:
@@ -3208,7 +4146,7 @@ async def get_similar_products(request: dict):
             session_id=f"similar-products-{uuid.uuid4()}",
             system_message="You are a product recommendation expert. Return ONLY valid JSON."
         )
-        chat.with_model("openai", "gpt-5.2")
+        chat.with_model("openai", "gpt-4o")
         
         prompt = f"""Based on the product "{product_name}" in category "{category}", suggest:
 1. Similar products (alternatives/competitors)
@@ -3251,10 +4189,10 @@ async def get_smart_recommendations(request: dict):
         
         api_key = os.environ.get('EMERGENT_LLM_KEY')
         if not api_key or not EMERGENT_AVAILABLE:
-            # Return trending products as fallback
+            # No API key - return empty results (no static fallback data)
             return {
                 "recommendations": [],
-                "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones", "Nike Air Max", "Samsung TV"]
+                "trending": []
             }
         
         chat = LlmChat(
@@ -3262,7 +4200,7 @@ async def get_smart_recommendations(request: dict):
             session_id=f"recommendations-{uuid.uuid4()}",
             system_message="You are a shopping recommendation AI. Return ONLY valid JSON."
         )
-        chat.with_model("openai", "gpt-5.2")
+        chat.with_model("openai", "gpt-4o")
         
         search_history = ", ".join(recent_searches[-5:]) if recent_searches else "none"
         
@@ -3296,7 +4234,7 @@ Provide 3-5 recommendations based on their interests."""
         
     except Exception as e:
         logger.error(f"Recommendations error: {e}")
-        return {"recommendations": [], "trending": ["iPhone 15", "MacBook Pro", "Sony Headphones"]}
+        return {"recommendations": [], "trending": []}
 
 # ================== EXCEL BULK PROCESSING ==================
 
@@ -3345,6 +4283,200 @@ def validate_and_filter_prices(prices_with_sources: list) -> list:
                    if sorted_prices[start_idx] <= prices_with_sources[i]['price'] <= sorted_prices[end_idx]]
     
     return filtered if filtered else prices_with_sources
+
+def generate_pdf_from_results(results, all_item_sources, total_your_amount, total_market_min_amount,
+                               total_market_med_amount, total_market_max_amount,
+                               your_grand_total, min_grand_total, med_grand_total, max_grand_total,
+                               timestamp):
+    """
+    Generate a PDF report that matches the Excel format exactly.
+    Returns a BytesIO buffer with the PDF content.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), 
+                            rightMargin=0.5*inch, leftMargin=0.5*inch,
+                            topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#2F5496'),
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    elements.append(Paragraph(f"Price Comparison Report - {timestamp}", title_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Prepare data table (first 20 items for main page)
+    table_data = []
+    
+    # Headers
+    headers = ['SL#', 'Item', 'Your Rate', 'Qty', 'Your Amt', 
+               'Min Rate', 'Min Amt', 'Med Rate', 'Med Amt', 
+               'Max Rate', 'Max Amt']
+    table_data.append(headers)
+    
+    # Data rows (showing key comparison data)
+    for idx, result in enumerate(results[:20], 1):  # Limit to 20 items for PDF readability
+        row = [
+            str(result.get('sl_no', idx)),
+            result['item'][:30] + '...' if len(result['item']) > 30 else result['item'],
+            f"₹{result['user_rate']:,.0f}" if isinstance(result['user_rate'], (int, float)) else str(result['user_rate']),
+            str(result['quantity']),
+            f"₹{result['user_amount']:,.0f}" if isinstance(result['user_amount'], (int, float)) else str(result['user_amount']),
+            f"₹{result.get('market_min_rate', 'N/A'):,.0f}" if isinstance(result.get('market_min_rate'), (int, float)) else str(result.get('market_min_rate', 'N/A')),
+            f"₹{result.get('market_min_total', 'N/A'):,.0f}" if isinstance(result.get('market_min_total'), (int, float)) else str(result.get('market_min_total', 'N/A')),
+            f"₹{result.get('market_med_rate', 'N/A'):,.0f}" if isinstance(result.get('market_med_rate'), (int, float)) else str(result.get('market_med_rate', 'N/A')),
+            f"₹{result.get('market_med_total', 'N/A'):,.0f}" if isinstance(result.get('market_med_total'), (int, float)) else str(result.get('market_med_total', 'N/A')),
+            f"₹{result.get('market_max_rate', 'N/A'):,.0f}" if isinstance(result.get('market_max_rate'), (int, float)) else str(result.get('market_max_rate', 'N/A')),
+            f"₹{result.get('market_max_total', 'N/A'):,.0f}" if isinstance(result.get('market_max_total'), (int, float)) else str(result.get('market_max_total', 'N/A'))
+        ]
+        table_data.append(row)
+    
+    # Create table with styling
+    table = Table(table_data, colWidths=[0.4*inch, 2.2*inch, 0.7*inch, 0.4*inch, 0.8*inch,
+                                         0.7*inch, 0.8*inch, 0.7*inch, 0.8*inch, 
+                                         0.7*inch, 0.8*inch])
+    
+    # Table styling to match Excel colors
+    table_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2F5496')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2F2F2')]),
+        # Min columns - light green
+        ('BACKGROUND', (5, 1), (6, -1), colors.HexColor('#E2EFDA')),
+        # Med columns - light yellow
+        ('BACKGROUND', (7, 1), (8, -1), colors.HexColor('#FFF2CC')),
+        # Max columns - light orange
+        ('BACKGROUND', (9, 1), (10, -1), colors.HexColor('#FCE4D6')),
+    ]
+    
+    table.setStyle(TableStyle(table_style))
+    elements.append(table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # GST Summary Section
+    summary_title = ParagraphStyle(
+        'SummaryTitle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        textColor=colors.HexColor('#1F4E79'),
+        spaceAfter=10,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold'
+    )
+    elements.append(Paragraph("CONSOLIDATED GST SUMMARY", summary_title))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Calculate GST
+    cgst_rate = 0.09
+    sgst_rate = 0.09
+    
+    your_cgst = round(total_your_amount * cgst_rate, 2)
+    your_sgst = round(total_your_amount * sgst_rate, 2)
+    
+    min_cgst = round(total_market_min_amount * cgst_rate, 2)
+    min_sgst = round(total_market_min_amount * sgst_rate, 2)
+    
+    med_cgst = round(total_market_med_amount * cgst_rate, 2)
+    med_sgst = round(total_market_med_amount * sgst_rate, 2)
+    
+    max_cgst = round(total_market_max_amount * cgst_rate, 2)
+    max_sgst = round(total_market_max_amount * sgst_rate, 2)
+    
+    # GST Summary Table
+    gst_data = [
+        ['', 'YOUR PRICING', 'MARKET MINIMUM', 'MARKET MEDIUM', 'MARKET MAXIMUM'],
+        ['Taxable Amount', f"₹{total_your_amount:,.2f}", f"₹{total_market_min_amount:,.2f}", 
+         f"₹{total_market_med_amount:,.2f}", f"₹{total_market_max_amount:,.2f}"],
+        ['CGST @ 9.0%', f"₹{your_cgst:,.2f}", f"₹{min_cgst:,.2f}", 
+         f"₹{med_cgst:,.2f}", f"₹{max_cgst:,.2f}"],
+        ['SGST @ 9.0%', f"₹{your_sgst:,.2f}", f"₹{min_sgst:,.2f}", 
+         f"₹{med_sgst:,.2f}", f"₹{max_sgst:,.2f}"],
+        ['Grand Total', f"₹{your_grand_total:,.2f}", f"₹{min_grand_total:,.2f}", 
+         f"₹{med_grand_total:,.2f}", f"₹{max_grand_total:,.2f}"],
+    ]
+    
+    gst_table = Table(gst_data, colWidths=[2*inch, 2*inch, 2*inch, 2*inch, 2*inch])
+    gst_style = [
+        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#2F5496')),
+        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#548235')),
+        ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#BF8F00')),
+        ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#C65911')),
+        ('TEXTCOLOR', (1, 0), (4, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTNAME', (0, 4), (-1, 4), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('BACKGROUND', (0, 4), (0, 4), colors.HexColor('#D9EAD3')),
+        ('BACKGROUND', (1, 4), (1, 4), colors.HexColor('#D9EAD3')),
+        ('BACKGROUND', (2, 4), (2, 4), colors.HexColor('#E2EFDA')),
+        ('BACKGROUND', (3, 4), (3, 4), colors.HexColor('#FFF2CC')),
+        ('BACKGROUND', (4, 4), (4, 4), colors.HexColor('#FCE4D6')),
+    ]
+    gst_table.setStyle(TableStyle(gst_style))
+    elements.append(gst_table)
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Comparison message
+    savings_vs_min = your_grand_total - min_grand_total
+    if savings_vs_min > 0:
+        comparison_text = f"COMPARISON: Your Grand Total (₹{your_grand_total:,}) is ₹{savings_vs_min:,} MORE than Market Minimum - OVERPAYING"
+        comp_color = colors.HexColor('#FFC7CE')
+    elif savings_vs_min < 0:
+        comparison_text = f"COMPARISON: Your Grand Total (₹{your_grand_total:,}) is ₹{abs(savings_vs_min):,} LESS than Market Minimum - GOOD DEAL"
+        comp_color = colors.HexColor('#C6EFCE')
+    else:
+        comparison_text = f"COMPARISON: Your Grand Total matches Market Minimum"
+        comp_color = colors.white
+    
+    comp_style = ParagraphStyle(
+        'Comparison',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.black,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+        backColor=comp_color,
+        borderPadding=10
+    )
+    elements.append(Paragraph(comparison_text, comp_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    # Legend
+    legend_text = """
+    <b>Legend:</b><br/>
+    <font color="#006100">Green = Good Deal (Your rate is LOWER than market rate)</font><br/>
+    <font color="#9C0006">Red = Overpaying (Your rate is HIGHER than market rate)</font><br/><br/>
+    <i>Note: All prices sourced from real web searches. See Excel file for complete details and clickable source links.</i>
+    """
+    legend_style = ParagraphStyle(
+        'Legend',
+        parent=styles['Normal'],
+        fontSize=8,
+        spaceAfter=10
+    )
+    elements.append(Paragraph(legend_text, legend_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
 
 @api_router.post("/bulk-search/upload")
 async def bulk_search_upload(file: UploadFile = File(...)):
@@ -3492,9 +4624,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         
         logger.info(f"Processing {len(products)} items from Excel upload")
         
-        # Process each product
-        results = []
-        for idx, product_info in enumerate(products):
+        # Process products concurrently in batches for better performance
+        async def process_single_product(idx, product_info):
+            """Process a single product and return its result"""
             try:
                 logger.info(f"Processing {idx + 1}/{len(products)}: {product_info['item']} (Qty: {product_info['quantity']})")
                 
@@ -3571,7 +4703,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         mid_idx_src = len(sorted_validated) // 2
                         med_source_item = sorted_validated[mid_idx_src]
                         
-                        results.append({
+                        return {
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
                             "user_rate": round(user_rate, 2),
@@ -3601,62 +4733,59 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                             "search_timestamp": datetime.now().isoformat(),
                             "price_adjusted": False,
                             "adjustment_note": ""
-                        })
+                        }
                     else:
                         # No validated prices
-                        results.append({
+                        return {
                             "sl_no": product_info['sl_no'],
                             "item": product_info['item'],
                             "user_rate": round(user_rate, 2),
                             "quantity": quantity,
                             "user_amount": round(user_amount, 2),
-                            "market_min_rate": "N/A",
-                            "market_min_total": "N/A",
+                            "market_min_rate": "Live price not available",
+                            "market_min_total": "Live price not available",
                             "rate_diff_min": "N/A",
                             "amount_diff_min": "N/A",
-                            "market_med_rate": "N/A",
-                            "market_med_total": "N/A",
+                            "market_med_rate": "Live price not available",
+                            "market_med_total": "Live price not available",
                             "rate_diff_med": "N/A",
                             "amount_diff_med": "N/A",
-                            "market_max_rate": "N/A",
-                            "market_max_total": "N/A",
+                            "market_max_rate": "Live price not available",
+                            "market_max_total": "Live price not available",
                             "rate_diff_max": "N/A",
                             "amount_diff_max": "N/A",
-                            "website_links": "No valid prices found",
-                            "vendor_details": "No valid prices found"
-                        })
+                            "website_links": "Live price not available - manual verification required",
+                            "vendor_details": "Live price not available - manual verification required"
+                        }
                 else:
                     # No search results
-                    results.append({
+                    return {
                         "sl_no": product_info['sl_no'],
                         "item": product_info['item'],
                         "user_rate": round(user_rate, 2),
                         "quantity": quantity,
                         "user_amount": round(user_amount, 2),
-                        "market_min_rate": "N/A",
-                        "market_min_total": "N/A",
+                        "market_min_rate": "Live price not available",
+                        "market_min_total": "Live price not available",
                         "rate_diff_min": "N/A",
                         "amount_diff_min": "N/A",
-                        "market_med_rate": "N/A",
-                        "market_med_total": "N/A",
+                        "market_med_rate": "Live price not available",
+                        "market_med_total": "Live price not available",
                         "rate_diff_med": "N/A",
                         "amount_diff_med": "N/A",
-                        "market_max_rate": "N/A",
-                        "market_max_total": "N/A",
+                        "market_max_rate": "Live price not available",
+                        "market_max_total": "Live price not available",
                         "rate_diff_max": "N/A",
                         "amount_diff_max": "N/A",
-                        "website_links": "No results found",
-                        "vendor_details": "No results found"
-                    })
-                
-                # Small delay to avoid rate limiting
-                await asyncio.sleep(0.1)
+                        "website_links": "Live price not available - manual verification required",
+                        "vendor_details": "Live price not available - manual verification required"
+                    }
                 
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Error processing item {product_info['item']}: {error_msg}")
                 
-                results.append({
+                return {
                     "sl_no": product_info['sl_no'],
                     "item": product_info['item'],
                     "user_rate": product_info.get('user_rate', 0),
@@ -3676,7 +4805,29 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                     "amount_diff_max": "Error",
                     "website_links": f"Error: {error_msg}",
                     "vendor_details": "Error"
-                })
+                }
+        
+        # Process products in batches concurrently (5 at a time to avoid overwhelming the system)
+        results = []
+        batch_size = 5
+        
+        for i in range(0, len(products), batch_size):
+            batch = products[i:i + batch_size]
+            batch_tasks = [process_single_product(idx + i, product_info) for idx, product_info in enumerate(batch)]
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            # Handle results and exceptions
+            for result in batch_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Batch processing error: {result}")
+                else:
+                    results.append(result)
+            
+            # Small delay between batches to avoid rate limiting
+            if i + batch_size < len(products):
+                await asyncio.sleep(0.5)
+        
+        logger.info(f"Completed processing {len(results)} items")
         
         # Generate output Excel with consolidated GST summary
         output_workbook = Workbook()
@@ -3711,14 +4862,14 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         max_fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")  # Max section - light orange
         adjusted_fill = PatternFill(start_color="E6E6FA", end_color="E6E6FA", fill_type="solid")  # Lavender for adjusted prices
         
-        # Headers with Min, Med, Max rate columns + Source info + Diff columns
+        # Headers with Min, Med, Max rate columns + combined Website Links & Vendor Details
         headers = [
             "SL No", "Item", 
             "Your Rate (₹)", "Qty", "Your Amount (₹)",
-            "Min Rate (₹)", "Min Amount (₹)", "Min Source", "Rate Diff (Min) (₹)", "Amount Diff (Min) (₹)",
-            "Med Rate (₹)", "Med Amount (₹)", "Med Source", "Rate Diff (Med) (₹)", "Amount Diff (Med) (₹)",
-            "Max Rate (₹)", "Max Amount (₹)", "Max Source", "Rate Diff (Max) (₹)", "Amount Diff (Max) (₹)",
-            "All Sources"
+            "Min Rate (₹)", "Min Amount (₹)", "Rate Diff (Min) (₹)", "Amount Diff (Min) (₹)",
+            "Med Rate (₹)", "Med Amount (₹)", "Rate Diff (Med) (₹)", "Amount Diff (Med) (₹)",
+            "Max Rate (₹)", "Max Amount (₹)", "Rate Diff (Max) (₹)", "Amount Diff (Max) (₹)",
+            "Website Links", "Vendor Details"
         ]
         
         # Write column headers (row 1)
@@ -3729,11 +4880,11 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             cell.alignment = header_alignment
             cell.border = thin_border
             # Color-code market rate columns
-            if 'Min' in header and 'Source' not in header:
+            if 'Min' in header and 'Website' not in header and 'Vendor' not in header:
                 cell.fill = PatternFill(start_color="548235", end_color="548235", fill_type="solid")
-            elif 'Med' in header and 'Source' not in header:
+            elif 'Med' in header and 'Website' not in header and 'Vendor' not in header:
                 cell.fill = PatternFill(start_color="BF8F00", end_color="BF8F00", fill_type="solid")
-            elif 'Max' in header and 'Source' not in header:
+            elif 'Max' in header and 'Website' not in header and 'Vendor' not in header:
                 cell.fill = PatternFill(start_color="C65911", end_color="C65911", fill_type="solid")
         
         # Calculate totals while writing data
@@ -3776,20 +4927,18 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 result['user_amount'],                        # E - Your Amount
                 result.get('market_min_rate', 'N/A'),         # F - Min Rate
                 result.get('market_min_total', 'N/A'),        # G - Min Amount
-                result.get('min_source', 'N/A'),              # H - Min Source
-                result.get('rate_diff_min', 'N/A'),           # I - Rate Diff (Min)
-                result.get('amount_diff_min', 'N/A'),         # J - Amount Diff (Min)
-                result.get('market_med_rate', 'N/A'),         # K - Med Rate
-                result.get('market_med_total', 'N/A'),        # L - Med Amount
-                result.get('med_source', 'N/A'),              # M - Med Source
-                result.get('rate_diff_med', 'N/A'),           # N - Rate Diff (Med)
-                result.get('amount_diff_med', 'N/A'),         # O - Amount Diff (Med)
-                result.get('market_max_rate', 'N/A'),         # P - Max Rate
-                result.get('market_max_total', 'N/A'),        # Q - Max Amount
-                result.get('max_source', 'N/A'),              # R - Max Source
-                result.get('rate_diff_max', 'N/A'),           # S - Rate Diff (Max)
-                result.get('amount_diff_max', 'N/A'),         # T - Amount Diff (Max)
-                result.get('vendor_details', '')              # U - All Sources
+                result.get('rate_diff_min', 'N/A'),           # H - Rate Diff (Min)
+                result.get('amount_diff_min', 'N/A'),         # I - Amount Diff (Min)
+                result.get('market_med_rate', 'N/A'),         # J - Med Rate
+                result.get('market_med_total', 'N/A'),        # K - Med Amount
+                result.get('rate_diff_med', 'N/A'),           # L - Rate Diff (Med)
+                result.get('amount_diff_med', 'N/A'),         # M - Amount Diff (Med)
+                result.get('market_max_rate', 'N/A'),         # N - Max Rate
+                result.get('market_max_total', 'N/A'),        # O - Max Amount
+                result.get('rate_diff_max', 'N/A'),           # P - Rate Diff (Max)
+                result.get('amount_diff_max', 'N/A'),         # Q - Amount Diff (Max)
+                result.get('website_links', ''),              # R - Website Links (combined)
+                result.get('vendor_details', '')              # S - Vendor Details (combined)
             ]
             
             for col_idx, value in enumerate(data, start=1):
@@ -3799,23 +4948,25 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                 # Number columns - right align (all numeric columns)
                 if col_idx in [3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20]:
                     cell.alignment = Alignment(horizontal="right")
-                elif col_idx in [8, 13, 18, 21]:  # Source columns - wrap text
+                elif col_idx in [8, 13, 18, 218, 9, 10, 11, 12, 13, 14, 15, 16, 17]:
+                    cell.alignment = Alignment(horizontal="right")
+                elif col_idx in [18, 19]:  # Website Links and Vendor Details - wrap text
                     cell.alignment = Alignment(wrap_text=True, vertical="top")
                 
                 # Color-code market rate columns with light backgrounds
                 if col_idx in [6, 7]:  # Min Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = min_fill
-                elif col_idx in [11, 12]:  # Med Rate & Amount columns
+                elif col_idx in [10, 11]:  # Med Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = med_fill
-                elif col_idx in [16, 17]:  # Max Rate & Amount columns
+                elif col_idx in [14, 15]:  # Max Rate & Amount columns
                     if isinstance(value, (int, float)):
                         cell.fill = max_fill
                 
                 # Apply color highlighting for ALL difference columns
-                # Min Diff (I, J), Med Diff (N, O), Max Diff (S, T)
-                if col_idx in [9, 10, 14, 15, 19, 20]:
+                # Min Diff (H, I), Med Diff (L, M), Max Diff (P, Q)
+                if col_idx in [8, 9, 12, 13, 16, 17]:
                     if isinstance(value, (int, float)):
                         if value > 0:  # Positive = You're paying MORE than market (Overpaying)
                             cell.fill = red_fill
@@ -3832,7 +4983,7 @@ async def bulk_search_upload(file: UploadFile = File(...)):
             if isinstance(user_rate, (int, float)) and isinstance(min_rate, (int, float)):
                 if user_rate < min_rate:
                     # Good deal - highlight row lightly
-                    for col in range(1, 22):
+                    for col in range(1, 20):  # Updated column count (19 columns total)
                         cell = output_sheet.cell(row=row_idx, column=col)
                         if not cell.fill.start_color.index or cell.fill.start_color.index == '00000000':
                             cell.fill = green_fill
@@ -3844,17 +4995,9 @@ async def bulk_search_upload(file: UploadFile = File(...)):
                         cell = output_sheet.cell(row=row_idx, column=col)
                         cell.fill = red_fill
                         cell.font = Font(bold=True, color="9C0006")
-                elif col_idx in [10, 11]:  # Med Rate & Amount columns
-                    if isinstance(value, (int, float)):
-                        cell.fill = med_fill
-                elif col_idx in [14, 15]:  # Max Rate & Amount columns
-                    if isinstance(value, (int, float)):
-                        cell.fill = max_fill
                 
-        # Adjust column widths (21 columns)
-        column_widths = [8, 30, 12, 6, 14, 12, 13, 15, 12, 14, 12, 13, 15, 12, 14, 12, 13, 15, 12, 14, 35]
-        for col_idx, width in enumerate(column_widths, start=1):
-            output_sheet.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = width
+        # Adjust column widths (19 columns now - removed 3 separate source columns, kept 2 combined)
+        column_widths = [8, 30, 12, 6, 14, 12, 13, 12, 14, 12, 13, 12, 14, 12, 13, 12, 14, 40, 30]
         
         # Set row heights
         output_sheet.row_dimensions[1].height = 40  # Header row (taller for wrapped text)
@@ -4042,23 +5185,42 @@ async def bulk_search_upload(file: UploadFile = File(...)):
         sources_sheet.column_dimensions['D'].width = 60
         sources_sheet.column_dimensions['E'].width = 25
         
-        # Save to BytesIO
-        output_buffer = io.BytesIO()
-        output_workbook.save(output_buffer)
-        output_buffer.seek(0)
+        # Save Excel to BytesIO
+        excel_buffer = io.BytesIO()
+        output_workbook.save(excel_buffer)
+        excel_buffer.seek(0)
         
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"PriceComparison_Results_{timestamp}.xlsx"
+        excel_filename = f"PriceComparison_Results_{timestamp}.xlsx"
+        pdf_filename = f"PriceComparison_Results_{timestamp}.pdf"
+        zip_filename = f"PriceComparison_Results_{timestamp}.zip"
         
-        logger.info(f"Excel processing complete. Generated {output_filename} with {len(results)} results and {len(all_item_sources)} source entries.")
+        # Generate PDF version
+        pdf_buffer = generate_pdf_from_results(results, all_item_sources, 
+                                                total_your_amount, total_market_min_amount,
+                                                total_market_med_amount, total_market_max_amount,
+                                                your_grand_total, min_grand_total, med_grand_total, max_grand_total,
+                                                timestamp)
         
-        # Return as downloadable file
+        # Create ZIP file containing both Excel and PDF
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add Excel file
+            zip_file.writestr(excel_filename, excel_buffer.getvalue())
+            # Add PDF file
+            zip_file.writestr(pdf_filename, pdf_buffer.getvalue())
+        
+        zip_buffer.seek(0)
+        
+        logger.info(f"Processing complete. Generated {excel_filename} and {pdf_filename} with {len(results)} results and {len(all_item_sources)} source entries.")
+        
+        # Return ZIP file containing both Excel and PDF
         return StreamingResponse(
-            output_buffer,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            zip_buffer,
+            media_type="application/zip",
             headers={
-                "Content-Disposition": f"attachment; filename={output_filename}",
+                "Content-Disposition": f"attachment; filename={zip_filename}",
                 "Access-Control-Expose-Headers": "Content-Disposition"
             }
         )
@@ -4086,18 +5248,8 @@ async def download_template():
         cell.font = header_font
         cell.fill = header_fill
     
-    # Sample data with quantities
-    sample_data = [
-        [1, "iPhone 15 Pro", 5],
-        [2, "Samsung Galaxy S24", 10],
-        [3, "Sony WH-1000XM5 Headphones", 3],
-        [4, "MacBook Air M3", 2],
-        [5, "Dell XPS 15 Laptop", 4],
-    ]
-    
-    for row_idx, data in enumerate(sample_data, start=2):
-        for col_idx, value in enumerate(data, start=1):
-            sheet.cell(row=row_idx, column=col_idx, value=value)
+    # No sample data - user must provide their own products
+    # Template contains only headers for user to fill in
     
     # Adjust column widths
     sheet.column_dimensions['A'].width = 10
