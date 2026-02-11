@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from contextlib import asynccontextmanager
 import os
 import logging
 import json
@@ -26,10 +27,24 @@ from urllib.parse import quote_plus, urljoin
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Configure logging (must be early for other setup code)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# MongoDB connection (optional)
+try:
+    mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[os.environ.get('DB_NAME', 'pricenexus')]
+    MONGODB_AVAILABLE = True
+    logger.info(f"MongoDB connected: {mongo_url}")
+except Exception as e:
+    MONGODB_AVAILABLE = False
+    db = None
+    logger.warning(f"MongoDB not available: {e}. Search history will not be saved.")
 
 # SerpAPI configuration
 SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
@@ -40,18 +55,21 @@ SERPAPI_API_KEY = os.environ.get('SERPAPI_API_KEY', '')
 # Foursquare Places API configuration (FREE - 100k calls/month)
 FOURSQUARE_API_KEY = os.environ.get('FOURSQUARE_API_KEY', '')
 
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: nothing specific needed
+    yield
+    # Shutdown: close MongoDB client if available
+    if MONGODB_AVAILABLE and client:
+        client.close()
+        logger.info("MongoDB connection closed")
+
 # Create the main app without a prefix
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # ================== MODELS ==================
 class SearchRequest(BaseModel):
@@ -165,14 +183,31 @@ COUNTRY_KEYWORDS = {
 }
 
 # ================== AI INTEGRATION ==================
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+# Using fallback mode for AI features (emergentintegrations not available)
+EMERGENT_AVAILABLE = False
+
+# Define stub classes for AI functionality
+class LlmChat:
+    def __init__(self, *args, **kwargs):
+        pass
+    def with_model(self, *args, **kwargs):
+        return self
+    async def send_message(self, *args, **kwargs):
+        return ""
+
+class UserMessage:
+    def __init__(self, text=""):
+        self.text = text
 
 async def detect_product_with_ai(query: str) -> Dict[str, Any]:
     """Use AI to detect product information from user query"""
     try:
         api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
-            logger.warning("No EMERGENT_LLM_KEY found, using fallback")
+        if not api_key or not EMERGENT_AVAILABLE:
+            if not EMERGENT_AVAILABLE:
+                logger.info("AI package not available, using fallback product detection")
+            else:
+                logger.warning("No EMERGENT_LLM_KEY found, using fallback")
             return fallback_product_detection(query)
         
         # Check for obviously fictional/impossible items first
@@ -458,7 +493,7 @@ async def discover_marketplaces_with_ai(product_name: str, category: str, countr
     
     try:
         api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
+        if not api_key or not EMERGENT_AVAILABLE:
             return get_fallback_marketplaces(country, source_type)
         
         source_descriptions = {
@@ -1696,32 +1731,45 @@ def simplify_product_query(product_name: str) -> str:
 async def search_with_serpapi_enhanced(query: str, original_item: str, country: str = "india", max_results: int = 30) -> List[Dict]:
     """
     Enhanced search for product prices.
-    1. First tries SerpAPI (if key available and has quota)
-    2. Falls back to category-based price estimates for fast results
-    
-    Note: Free web scraping is often blocked by anti-bot measures,
-    so we use category-based estimates for reliable results.
+    1. First tries free web scraping (Bing, DuckDuckGo, Google)
+    2. Then tries SerpAPI (if key available)
+    3. Falls back to category-based estimates only if all fail
     """
     results = []
     
-    # Strategy 1: Try SerpAPI first (if available)
+    # Strategy 1: FREE - Try direct web scraping first (NO API KEY NEEDED!)
     try:
         simplified_query = simplify_product_query(query)
-        logger.info(f"Searching for: '{simplified_query}'")
+        logger.info(f"🌐 Searching web for live prices: '{simplified_query}'")
         
-        results = await search_with_serpapi(simplified_query, country, max_results)
-        if results:
-            logger.info(f"Found {len(results)} results with SerpAPI")
+        results = await search_real_web_prices(simplified_query, max_results)
+        if results and len(results) >= 3:  # Need at least 3 results for good comparison
+            logger.info(f"✅ Found {len(results)} REAL prices from web scraping")
             return results
+        elif results:
+            logger.info(f"⚠️ Found only {len(results)} prices, trying more sources...")
     except Exception as e:
-        error_msg = str(e)
-        if "quota" in error_msg.lower() or "run out" in error_msg.lower():
-            logger.info(f"SerpAPI quota exceeded, using estimated prices")
-        else:
-            logger.info(f"SerpAPI unavailable, using estimated prices")
+        logger.warning(f"Web scraping failed: {e}")
     
-    # Strategy 2: Use category-based price estimates (fast and reliable)
-    logger.info(f"Generating price estimates for: {query}")
+    # Strategy 2: Try SerpAPI (if available and has quota)
+    try:
+        if SERPAPI_API_KEY and SERPAPI_API_KEY != 'your_serpapi_key_here':
+            api_results = await search_with_serpapi(simplified_query, country, max_results)
+            if api_results:
+                results.extend(api_results)
+                logger.info(f"✅ Added {len(api_results)} results from SerpAPI")
+                if len(results) >= 5:
+                    return results
+    except Exception as e:
+        logger.info(f"SerpAPI unavailable: {str(e)}")
+    
+    # Strategy 3: If we have ANY results, return them
+    if results:
+        logger.info(f"✅ Returning {len(results)} combined results")
+        return results
+    
+    # Strategy 4: Last resort - use estimates (only when everything fails)
+    logger.warning(f"⚠️ All web sources failed, using estimated prices for: {query}")
     fallback = generate_estimated_prices(query)
     return fallback
 
@@ -2987,16 +3035,17 @@ async def search_products(request: SearchRequest):
                     "description": f"Local stores in {local_stores_city or 'your area'}"
                 })
             
-            # Store search in database
-            search_doc = {
-                "id": str(uuid.uuid4()),
-                "query": query,
-                "results_count": len(all_results),
-                "local_stores_count": len(local_stores),
-                "data_source": "serpapi_real",
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-            await db.searches.insert_one(search_doc)
+            # Store search in database (if available)
+            if MONGODB_AVAILABLE:
+                search_doc = {
+                    "id": str(uuid.uuid4()),
+                    "query": query,
+                    "results_count": len(all_results),
+                    "local_stores_count": len(local_stores),
+                    "data_source": "serpapi_real",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                await db.searches.insert_one(search_doc)
             
             # For real data, we extract filters from actual results
             available_filters = extract_filters_from_real_data(all_results)
@@ -3093,14 +3142,15 @@ This might be because:
                     "description": f"Search results from {result['source']}"
                 })
         
-        # Store search in database
-        search_doc = {
-            "id": str(uuid.uuid4()),
-            "query": query,
-            "results_count": len(all_results),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-        await db.searches.insert_one(search_doc)
+        # Store search in database (if available)
+        if MONGODB_AVAILABLE:
+            search_doc = {
+                "id": str(uuid.uuid4()),
+                "query": query,
+                "results_count": len(all_results),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            await db.searches.insert_one(search_doc)
         
         # Extract available filter options from product data for frontend
         available_filters = {
@@ -3134,6 +3184,8 @@ This might be because:
 @api_router.get("/recent-searches")
 async def get_recent_searches():
     """Get recent searches"""
+    if not MONGODB_AVAILABLE:
+        return {"searches": []}
     searches = await db.searches.find({}, {"_id": 0}).sort("timestamp", -1).to_list(10)
     return {"searches": searches}
 
@@ -3148,8 +3200,8 @@ async def get_similar_products(request: dict):
             return {"similar": [], "recommendations": []}
         
         api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
-            return {"similar": [], "recommendations": []}
+        if not api_key or not EMERGENT_AVAILABLE:
+            return {"similar": [], "complementary": [], "reasons": {}}
         
         chat = LlmChat(
             api_key=api_key,
@@ -3198,7 +3250,7 @@ async def get_smart_recommendations(request: dict):
             return {"recommendations": [], "trending": []}
         
         api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
+        if not api_key or not EMERGENT_AVAILABLE:
             # Return trending products as fallback
             return {
                 "recommendations": [],
@@ -4083,7 +4135,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
